@@ -13,6 +13,8 @@ import io
 import re
 from datetime import date, datetime, timezone
 
+from .config import APP_NAME
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS farm_profile (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -368,6 +370,6 @@ def to_print_html(records: list[dict], profile: dict, period: str) -> str:
 {body}
 </tbody></table>
 <p class="foot">Údaje podle § 11 odst. 1 vyhlášky č. 132/2018 Sb. (ve znění vyhlášky č. 200/2023 Sb.) a nařízení (EU) 2023/564.
-Vytištěno {printed} z aplikace Farm App.</p>
+Vytištěno {printed} z aplikace {_e(APP_NAME)}.</p>
 <script>if (location.search.includes("auto=1")) window.addEventListener("load", () => setTimeout(() => window.print(), 300));</script>
 </body></html>"""

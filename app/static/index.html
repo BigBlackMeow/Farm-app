@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Farm App – přípravky na pozemek</title>
+<title>Farm App – přípravky na pozemek</title><!-- název se bere z app/config.py -->
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <style>
   :root {
@@ -19,8 +19,9 @@
   h1, h2, h3 { line-height:1.2; }
   a { color:var(--accent); }
   label { display:block; font-size:13px; color:var(--muted); margin:12px 0 5px; font-weight:500; }
-  input, select { font:inherit; padding:11px 13px; border:1px solid var(--line); border-radius:10px; width:100%; background:#fff; color:var(--text); }
-  input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent; }
+  input, select, textarea { font:inherit; padding:11px 13px; border:1px solid var(--line); border-radius:10px; width:100%; background:#fff; color:var(--text); }
+  textarea { resize:vertical; min-height:160px; line-height:1.5; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent; }
   .btn { font:inherit; font-weight:600; padding:11px 20px; border-radius:999px; border:1px solid transparent; cursor:pointer;
          background:var(--accent); color:#fff; transition:background .15s, transform .05s; white-space:nowrap; }
   .btn:hover { background:var(--accent-dark); } .btn:active { transform:translateY(1px); }
@@ -61,7 +62,7 @@
   .topbar .spacer { flex:1; }
   .user { font-size:14px; color:var(--muted); }
   .topnav button { white-space:nowrap; }
-  @media (max-width: 640px) { .user, .topbar .brand span { display:none; } .topbar-in { padding:8px 12px; gap:6px; } .topnav { margin-left:0; } .topnav button { padding:7px 10px; font-size:14px; } }
+  @media (max-width: 640px) { .user, .topbar .brand span { display:none; } .topbar-in { padding:8px 12px; gap:6px; } .topnav { margin-left:0; flex:1; min-width:0; overflow-x:auto; scrollbar-width:none; } .topbar .spacer { display:none; } .topnav button { padding:7px 10px; font-size:14px; } }
 
   /* stepper */
   .stepper { display:flex; gap:0; max-width:1400px; margin:0 auto; padding:0 20px; }
@@ -176,6 +177,21 @@
   .dose-row { display:flex; gap:8px; } .dose-row input { flex:1; min-width:0; } .dose-row select { width:110px; flex:none; }
   .profile-warn { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
 
+  /* support form */
+  .support-grid { display:grid; grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); gap:16px; align-items:start; }
+  @media (max-width: 860px) { .support-grid { grid-template-columns:1fr; } }
+  .kinds { grid-template-columns:repeat(3, 1fr); margin-top:6px; }
+  .kinds .option b { font-size:16px; }
+  @media (max-width: 520px) { .kinds { gap:6px; } .kinds .option { padding:10px 8px; text-align:center; } .kinds .option b { font-size:14px; } .kinds .option span { display:none; } }
+  .notice { border-radius:12px; padding:12px 14px; font-size:14px; margin-top:14px; }
+  .notice.ok { background:var(--ok-bg); color:var(--ok); } .notice.warn { background:var(--warn-bg); color:var(--warn); }
+  .smsg { border-bottom:1px solid var(--line); padding:10px 0; } .smsg:last-child { border-bottom:0; }
+  .smsg .top { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+  .smsg .st { font-size:12px; font-weight:600; white-space:nowrap; } .st.sent { color:var(--ok); } .st.wait { color:var(--warn); }
+  .smsg p { margin:4px 0 0; font-size:14px; color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; max-height:4.5em; overflow:hidden; }
+  details.tech summary { cursor:pointer; font-size:13px; color:var(--muted); margin-top:4px; }
+  details.tech pre { white-space:pre-wrap; font-size:12px; background:var(--bg); padding:8px 10px; border-radius:8px; margin:6px 0 0; }
+
   /* bottom bar (summary + next) */
   .banner { background:var(--block-bg); color:var(--block); border-bottom:1px solid #f1c7c2; padding:10px 20px; font-size:14px; font-weight:600; text-align:center; }
   .bottombar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); z-index:1000;
@@ -191,7 +207,7 @@
 <!-- ================= login / registration ================= -->
 <section id="login" hidden>
   <div class="login-card">
-    <div class="brand"><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg> Farm App</div>
+    <div class="brand"><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg> <span class="app-name">Farm App</span></div>
     <h1 id="authTitle">Přihlášení</h1>
     <p class="lead">Přípravky na ochranu rostlin povolené na váš pozemek.</p>
     <div class="tabs" role="tablist">
@@ -215,11 +231,12 @@
 <div id="app" hidden>
   <header class="topbar">
     <div class="topbar-in">
-      <div class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg><span>Farm App</span></div>
+      <div class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg><span class="app-name">Farm App</span></div>
       <nav class="topnav">
         <button id="navWizard" class="active">Vyhodnocení</button>
         <button id="navStock">Můj sklad <span id="stockCount"></span></button>
         <button id="navRecords">Evidence</button>
+        <button id="navSupport">Podpora</button>
       </nav>
       <div class="spacer"></div>
       <span class="user" id="userName"></span>
@@ -401,6 +418,33 @@
     </form>
   </main>
 
+  <!-- support: bug report / feature request / question -->
+  <main class="page" id="support" hidden>
+    <div class="page-head"><h2>Podpora</h2><p>Našli jste chybu, chybí vám nějaká funkce, nebo něčemu nerozumíte? Napište nám.</p></div>
+    <div class="support-grid">
+      <form class="card" id="sf" novalidate>
+        <label>O co jde?</label>
+        <div class="options kinds" id="sfKinds">
+          <button type="button" class="option active" data-v="chyba"><b>Chyba</b><span>něco nefunguje</span></button>
+          <button type="button" class="option" data-v="napad"><b>Nová funkce</b><span>nápad, co přidat</span></button>
+          <button type="button" class="option" data-v="dotaz"><b>Dotaz</b><span>nevím si rady</span></button>
+        </div>
+        <label for="sf_subject">Předmět</label><input id="sf_subject" maxlength="200" placeholder="krátce, např. Nejde načíst pole">
+        <label for="sf_message" class="req">Zpráva</label>
+        <textarea id="sf_message" maxlength="10000"></textarea>
+        <label for="sf_contact">Kam vám máme odpovědět</label><input id="sf_contact" maxlength="200" placeholder="e-mail nebo telefon">
+        <label class="check"><input type="checkbox" id="sf_tech" checked> Přiložit technické údaje (prohlížeč, vybraný pozemek a plodina)</label>
+        <details class="tech"><summary>Co se přiloží</summary><pre id="sfTechPreview"></pre></details>
+        <div id="sfErr" class="error"></div>
+        <div id="sfDone" hidden></div>
+      </form>
+      <div class="card">
+        <h3 style="margin-top:0">Moje zprávy</h3>
+        <div id="sfList"><p class="muted">Zatím jste nic neposlali.</p></div>
+      </div>
+    </div>
+  </main>
+
   <footer class="bottombar">
     <div class="bottombar-in">
       <button class="btn ghost" id="back" hidden>Zpět</button>
@@ -499,6 +543,12 @@ function updateBar() {
     $("#next").textContent = view === "records" ? "+ Nový záznam" : "Uložit záznam"; $("#next").disabled = false;
     return;
   }
+  if (view === "support") {
+    $("#back").hidden = false; $("#back").textContent = "Zpět";
+    $("#sum").innerHTML = "Hlášení chyby, nápad nebo dotaz";
+    $("#next").textContent = "Odeslat zprávu"; $("#next").disabled = sending;
+    return;
+  }
   $("#back").textContent = "Zpět";
   if (view === "stock") { $("#sum").innerHTML = `<b>${stock.length}</b> přípravků na skladě`; }
   else $("#sum").innerHTML = parts.join(" · ") || "Vyberte pozemek v mapě";
@@ -512,8 +562,9 @@ function updateBar() {
   $("#sub2").textContent = crop || "co a čím stříkáte";
   $("#sub3").textContent = lastResult ? `${lastResult.counts.ok + lastResult.counts.warn} použitelných` : "povolené přípravky";
 }
-$("#back").onclick = () => view === "form" ? showRecords() : view === "stock" ? goStep(step) : goStep(step - 1);
+$("#back").onclick = () => view === "support" ? goStep(step) : view === "form" ? showRecords() : view === "stock" ? goStep(step) : goStep(step - 1);
 $("#next").onclick = () => {
+  if (view === "support") return sendSupport();
   if (view === "stock") return goStep(step);
   if (view === "records") { rfContext = null; return openRecordForm({}, null); }
   if (view === "form") return saveRecord();
@@ -876,7 +927,7 @@ const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOff
 
 function hidePages() {
   [1, 2, 3].forEach(i => $("#step" + i).hidden = true);
-  ["#stock", "#records", "#recordForm"].forEach(s => $(s).hidden = true);
+  ["#stock", "#records", "#recordForm", "#support"].forEach(s => $(s).hidden = true);
   $("#stepper").hidden = true;
   $$(".topnav button").forEach(b => b.classList.remove("active"));
 }
@@ -1076,8 +1127,120 @@ async function saveRecord() {
   } catch (err) { $("#rfErr").textContent = err.message; $("#next").disabled = false; }
 }
 
+/* ---------------- support ("Podpora") ---------------- */
+let sfKind = "chyba", sending = false, appMeta = {}, sfMsgs = [];
+const SF_HINTS = {
+  chyba: "Co jste dělali, co se stalo a co jste čekali? Např.: Na kroku Plodina jsem vybral pšenici ozimou, po kliknutí na Vyhodnotit se nic nestalo.",
+  napad: "Co by vám aplikace měla umět a k čemu by vám to pomohlo?",
+  dotaz: "Na co se chcete zeptat?",
+};
+function setKind(k) {
+  sfKind = k;
+  $$("#sfKinds .option").forEach(b => b.classList.toggle("active", b.dataset.v === k));
+  $("#sf_message").placeholder = SF_HINTS[k];
+  $("#sf_tech").checked = k === "chyba";
+  updateTechPreview();
+}
+$$("#sfKinds .option").forEach(b => b.onclick = () => setKind(b.dataset.v));
+const VIEW_NAMES = { wizard: "Vyhodnocení", stock: "Můj sklad", records: "Evidence", form: "Záznam o postřiku", support: "Podpora" };
+let supportFrom = "wizard";
+function techInfo() {
+  const lines = [
+    `Aplikace: ${appMeta.app_name || ""}`,
+    `Stránka: ${VIEW_NAMES[supportFrom] || supportFrom}${supportFrom === "wizard" ? `, krok ${step}` : ""}`,
+    field ? `Pozemek: ${field.short_code} ${field.square || ""} (${num(field.area_ha)} ha)` : "Pozemek: nevybrán",
+    `Plodina: ${crop || "nevybrána"}`,
+    `Trysky: ${nozzle ? nozzle + " %" : "bez redukce"}`,
+    `Registr přípravků: ${appMeta.registry_ready ? (appMeta.registry_date || "ano") : "nestažený"}`,
+    `Prohlížeč: ${navigator.userAgent}`,
+    `Okno: ${window.innerWidth}×${window.innerHeight}`,
+    `Čas: ${new Date().toLocaleString("cs-CZ")}`,
+  ];
+  return lines.join("\n");
+}
+function updateTechPreview() { $("#sfTechPreview").textContent = techInfo(); }
+$("#sf_tech").onchange = updateTechPreview;
+async function showSupport() {
+  if (view !== "support") supportFrom = view;
+  view = "support"; hidePages();
+  $("#navSupport").classList.add("active"); $("#support").hidden = false;
+  if (!$("#sf_contact").value && me) $("#sf_contact").value = me.email;
+  $("#sfErr").textContent = "";
+  setKind(sfKind); updateBar(); window.scrollTo(0, 0);
+  loadSupport();
+}
+$("#navSupport").onclick = showSupport;
+$("#sf").onsubmit = e => { e.preventDefault(); sendSupport(); };
+$("#sf_message").oninput = () => { $("#sfDone").hidden = true; };
+
+async function loadSupport() {
+  try { sfMsgs = await api("/api/support"); } catch (err) { return; }
+  renderSupportList();
+}
+function renderSupportList() {
+  if (!sfMsgs.length) { $("#sfList").innerHTML = '<p class="muted">Zatím jste nic neposlali.</p>'; return; }
+  $("#sfList").innerHTML = sfMsgs.map(m => {
+    const when = new Date(m.created_at).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const st = m.sent_at ? '<span class="st sent">✓ odesláno</span>'
+      : `<span class="st wait">jen uloženo${appMeta.support_ready ? ` · <a href="#" data-resend="${m.id}">odeslat znovu</a>` : ""}</span>`;
+    return `<div class="smsg"><div class="top"><b>${esc(m.kind_label)}: ${esc(m.subject)}</b>${st}</div>
+      <div class="muted">${esc(when)}</div><p>${esc(m.message)}</p></div>`;
+  }).join("");
+  $$("#sfList [data-resend]").forEach(a => a.onclick = async e => {
+    e.preventDefault(); a.textContent = "odesílám…";
+    try { await deliver(await api(`/api/support/${a.dataset.resend}/payload`), +a.dataset.resend); }
+    catch (err) { /* status stays "jen uloženo" */ }
+    loadSupport();
+  });
+}
+
+/* Sends the e-mail through Web3Forms straight from the browser and tells the app whether it worked. */
+async function deliver(payload, id) {
+  let ok = false, error = "";
+  try {
+    const r = await fetch("https://api.web3forms.com/submit", {
+      method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(payload),
+    });
+    const d = await r.json().catch(() => ({}));
+    ok = r.ok && d.success !== false; if (!ok) error = d.message || `chyba ${r.status}`;
+  } catch (err) { error = "Nepodařilo se spojit se službou pro odesílání e-mailů."; }
+  await api(`/api/support/${id}/result`, { method: "POST", body: JSON.stringify({ ok, error }) }).catch(() => {});
+  return ok;
+}
+
+async function sendSupport() {
+  if (sending) return;
+  $("#sfErr").textContent = "";
+  if (!$("#sf_message").value.trim()) { $("#sfErr").textContent = "Napište prosím zprávu."; $("#sf_message").focus(); return; }
+  sending = true; updateBar(); $("#next").textContent = "Odesílám…";
+  try {
+    const body = { kind: sfKind, subject: $("#sf_subject").value, message: $("#sf_message").value,
+                   contact: $("#sf_contact").value, tech: $("#sf_tech").checked ? techInfo() : "" };
+    const res = await api("/api/support", { method: "POST", body: JSON.stringify(body) });
+    const ok = res.send ? await deliver(res.send, res.message.id) : false;
+    const mail = appMeta.support_email ? ` Pokud spěcháte, napište na <a href="mailto:${esc(appMeta.support_email)}">${esc(appMeta.support_email)}</a>.` : "";
+    $("#sfDone").hidden = false;
+    $("#sfDone").innerHTML = ok
+      ? '<div class="notice ok"><b>Děkujeme, zpráva je odeslaná.</b> Ozveme se na kontakt, který jste uvedli.</div>'
+      : res.send
+        ? `<div class="notice warn"><b>Zprávu jsme uložili, ale e-mail se teď nepodařilo odeslat.</b> Můžete to zkusit později v seznamu Moje zprávy (odkaz „odeslat znovu“).${mail}</div>`
+        : `<div class="notice warn"><b>Zprávu jsme uložili v aplikaci.</b> Odesílání e-mailem zatím není nastavené.${mail}</div>`;
+    $("#sf_subject").value = ""; $("#sf_message").value = "";
+    $("#sfDone").scrollIntoView({ behavior: "smooth", block: "center" });
+    loadSupport();
+  } catch (err) { $("#sfErr").textContent = err.message; }
+  sending = false; updateBar();
+}
+
+function applyAppName(m) {
+  if (!m.app_name) return;
+  $$(".app-name").forEach(e => e.textContent = m.app_name);
+  document.title = `${m.app_name} – ${m.app_tagline || ""}`;
+}
+
 /* ---------------- start ---------------- */
 fetch("/api/meta").then(r => r.json()).then(m => {
+  appMeta = m; applyAppName(m);
   if (!m.registry_ready) { $("#regBanner").textContent = m.message; $("#regBanner").hidden = false; }
   if (m.registry_date) $("#regdate").textContent = "Registr přípravků ÚKZÚZ ke dni " + new Date(m.registry_date).toLocaleDateString("cs-CZ") + ".";
 });

@@ -11,15 +11,17 @@ from fastapi.responses import FileResponse, HTMLResponse, Response as RawRespons
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import config
 from . import evaluate as ev
 from . import lpis
 from . import myfields as mf
 from . import records as rec
+from . import support as sup
 from . import users
 
 STATIC = Path(__file__).resolve().parent / "static"
 
-app = FastAPI(title="Farm App – přípravky na pozemek")
+app = FastAPI(title=f"{config.APP_NAME} – {config.APP_TAGLINE}")
 _registry = {"con": None}
 NO_REGISTRY = ("Registr přípravků není stažený. Zastavte aplikaci (Ctrl+C), spusťte "
                "python -m app.registry_import a pak aplikaci spusťte znovu.")
@@ -38,6 +40,7 @@ _fields: dict[str, dict] = {}  # field id -> {"field", "ctx"}; in-memory cache
 store = users.Store()
 records = rec.Records(store)
 my_fields = mf.MyFields(store)
+support = sup.Support(store)
 COOKIE = "farm_session"
 
 
@@ -168,11 +171,13 @@ def disconnect_my_fields(user: dict = Depends(current_user)):
 # --- fields and evaluation ----------------------------------------------------------------------
 @app.get("/api/meta")
 def meta():
+    app_info = {"app_name": config.APP_NAME, "app_tagline": config.APP_TAGLINE,
+                "support_email": config.SUPPORT_EMAIL, "support_ready": bool(config.SUPPORT_WEB3FORMS_KEY)}
     try:
         con = registry()
     except HTTPException:
-        return {"registry_date": "", "registry_ready": False, "message": NO_REGISTRY}
-    return {"registry_date": ev.registry_date(con), "registry_ready": True}
+        return {**app_info, "registry_date": "", "registry_ready": False, "message": NO_REGISTRY}
+    return {**app_info, "registry_date": ev.registry_date(con), "registry_ready": True}
 
 
 @app.get("/api/crops")
@@ -288,6 +293,66 @@ def print_records(request: Request, date_from: str = "", date_to: str = ""):
         return HTMLResponse('<p>Přihlaste se. <a href="/">Zpět do aplikace</a></p>', status_code=401)
     return rec.to_print_html(records.list(user["id"], date_from, date_to), records.profile(user["id"]),
                              _period(date_from, date_to))
+
+
+# --- support form ("Podpora") -------------------------------------------------------------------
+class SendResult(BaseModel):
+    ok: bool
+    error: str = ""
+
+
+def _email_payload(m: dict, user: dict) -> dict:
+    """What the browser sends to Web3Forms: the e-mail subject, reply-to address and readable fields."""
+    who = user.get("name") or user["email"]
+    payload = {
+        "access_key": config.SUPPORT_WEB3FORMS_KEY,
+        "subject": f"[{config.APP_NAME}] {m['kind_label']}: {m['subject']}",
+        "from_name": f"{config.APP_NAME}: {who}",
+        "Typ": m["kind_label"],
+        "Předmět": m["subject"],
+        "Zpráva": m["message"],
+        "Od": f"{who} <{user['email']}>",
+        "Kontakt pro odpověď": m["contact"] or user["email"],
+        "Číslo zprávy": m["id"],
+    }
+    if "@" in (m["contact"] or user["email"]):
+        payload["replyto"] = m["contact"] if "@" in m["contact"] else user["email"]
+    if m["tech"]:
+        payload["Technické údaje"] = m["tech"]
+    return payload
+
+
+@app.get("/api/support")
+def list_support(user: dict = Depends(current_user)):
+    return support.list(user["id"])
+
+
+@app.post("/api/support")
+def add_support(body: dict, user: dict = Depends(current_user)):
+    try:
+        m = support.add(user["id"], body)
+    except sup.SupportError as e:
+        raise HTTPException(400, str(e))
+    return {"message": m, "send": _email_payload(m, user) if config.SUPPORT_WEB3FORMS_KEY else None}
+
+
+@app.get("/api/support/{msg_id}/payload")
+def support_payload(msg_id: int, user: dict = Depends(current_user)):
+    try:
+        m = support.get(msg_id, user["id"])
+    except KeyError:
+        raise HTTPException(404, "Zpráva nenalezena.")
+    if not config.SUPPORT_WEB3FORMS_KEY:
+        raise HTTPException(400, "Odesílání e-mailem zatím není nastavené.")
+    return _email_payload(m, user)
+
+
+@app.post("/api/support/{msg_id}/result")
+def support_result(msg_id: int, body: SendResult, user: dict = Depends(current_user)):
+    try:
+        return support.mark(msg_id, user["id"], body.ok, body.error)
+    except KeyError:
+        raise HTTPException(404, "Zpráva nenalezena.")
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
