@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Farm App – přípravky na pozemek</title>
+<title>Farm App – přípravky na pozemek</title><!-- název se bere z app/config.py -->
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <style>
   :root {
@@ -19,8 +19,9 @@
   h1, h2, h3 { line-height:1.2; }
   a { color:var(--accent); }
   label { display:block; font-size:13px; color:var(--muted); margin:12px 0 5px; font-weight:500; }
-  input, select { font:inherit; padding:11px 13px; border:1px solid var(--line); border-radius:10px; width:100%; background:#fff; color:var(--text); }
-  input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent; }
+  input, select, textarea { font:inherit; padding:11px 13px; border:1px solid var(--line); border-radius:10px; width:100%; background:#fff; color:var(--text); }
+  textarea { resize:vertical; min-height:160px; line-height:1.5; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent; }
   .btn { font:inherit; font-weight:600; padding:11px 20px; border-radius:999px; border:1px solid transparent; cursor:pointer;
          background:var(--accent); color:#fff; transition:background .15s, transform .05s; white-space:nowrap; }
   .btn:hover { background:var(--accent-dark); } .btn:active { transform:translateY(1px); }
@@ -61,7 +62,7 @@
   .topbar .spacer { flex:1; }
   .user { font-size:14px; color:var(--muted); }
   .topnav button { white-space:nowrap; }
-  @media (max-width: 640px) { .user, .topbar .brand span { display:none; } .topbar-in { padding:8px 12px; gap:6px; } .topnav { margin-left:0; } .topnav button { padding:7px 10px; font-size:14px; } }
+  @media (max-width: 640px) { .user, .topbar .brand span { display:none; } .topbar-in { padding:8px 12px; gap:6px; } .topnav { margin-left:0; flex:1; min-width:0; overflow-x:auto; scrollbar-width:none; } .topbar .spacer { display:none; } .topnav button { padding:7px 10px; font-size:14px; } }
 
   /* stepper */
   .stepper { display:flex; gap:0; max-width:1400px; margin:0 auto; padding:0 20px; }
@@ -93,6 +94,24 @@
   .spinner { display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%;
     animation:spin .8s linear infinite; vertical-align:-2px; margin-right:6px; }
   @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* my fields */
+  .flist { list-style:none; padding:0; margin:10px 0 0; max-height:min(46vh, 420px); overflow-y:auto; border-top:1px solid var(--line); }
+  .flist li { display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); }
+  .flist li.active { background:var(--accent-soft); }
+  .flist .fl-main { flex:1; min-width:0; text-align:left; border:0; background:transparent; font:inherit; padding:9px 6px; cursor:pointer; color:var(--text); }
+  .flist .fl-main b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .flist .fl-main .muted { display:block; font-size:12px; }
+  .flist .rn { flex:1; display:flex; gap:6px; padding:6px 0; } .flist .rn input { padding:7px 10px; }
+  .flist .gone { color:var(--warn); }
+  .check { display:flex; align-items:center; gap:8px; color:var(--text); font-size:14px; margin:10px 0 0; cursor:pointer; }
+  .check input { width:auto; margin:0; }
+  .my-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .my-head h3 { margin:0; }
+  .flabel { background:rgba(255,255,255,.88); border:0; box-shadow:0 1px 3px rgba(0,0,0,.25); color:#18241a; font-weight:600; font-size:12px; padding:1px 6px; border-radius:6px; white-space:nowrap; }
+  .flabel::before { display:none; }
+  .flabel.sel { background:#214d29; color:#fff; }
+  .map-far .flabel { display:none; }
 
   /* step 2: options as cards */
   .two-col { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
@@ -138,6 +157,41 @@
   .plist li { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
   .plist li:last-child { border-bottom:0; }
 
+  /* spray records */
+  .rec-toolbar { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px; }
+  .rec-toolbar > div { min-width:140px; } .rec-toolbar label { margin-top:0; }
+  .rec-toolbar .grow { flex:1; }
+  .rec { border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fff; }
+  .rec-head { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .rec-head .date { font-weight:700; }
+  .rec .facts { margin-top:8px; }
+  .rec-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .todo { background:var(--warn-bg); color:var(--warn); border-radius:8px; padding:6px 10px; font-size:13px; margin-top:8px; }
+  .form-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:0 16px; }
+  .form-grid .span2 { grid-column:span 2; } .form-grid .span3 { grid-column:1 / -1; }
+  @media (max-width: 860px) { .form-grid { grid-template-columns:1fr 1fr; } .form-grid .span2 { grid-column:1 / -1; } }
+  @media (max-width: 520px) { .form-grid { grid-template-columns:1fr; } }
+  .form-section { margin-top:16px; } .form-section h3 { margin-bottom:0; }
+  .req::after { content:" *"; color:var(--block); }
+  .hint { font-size:12px; color:var(--muted); margin-top:3px; }
+  .dose-row { display:flex; gap:8px; } .dose-row input { flex:1; min-width:0; } .dose-row select { width:110px; flex:none; }
+  .profile-warn { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+
+  /* support form */
+  .support-grid { display:grid; grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); gap:16px; align-items:start; }
+  @media (max-width: 860px) { .support-grid { grid-template-columns:1fr; } }
+  .kinds { grid-template-columns:repeat(3, 1fr); margin-top:6px; }
+  .kinds .option b { font-size:16px; }
+  @media (max-width: 520px) { .kinds { gap:6px; } .kinds .option { padding:10px 8px; text-align:center; } .kinds .option b { font-size:14px; } .kinds .option span { display:none; } }
+  .notice { border-radius:12px; padding:12px 14px; font-size:14px; margin-top:14px; }
+  .notice.ok { background:var(--ok-bg); color:var(--ok); } .notice.warn { background:var(--warn-bg); color:var(--warn); }
+  .smsg { border-bottom:1px solid var(--line); padding:10px 0; } .smsg:last-child { border-bottom:0; }
+  .smsg .top { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+  .smsg .st { font-size:12px; font-weight:600; white-space:nowrap; } .st.sent { color:var(--ok); } .st.wait { color:var(--warn); }
+  .smsg p { margin:4px 0 0; font-size:14px; color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; max-height:4.5em; overflow:hidden; }
+  details.tech summary { cursor:pointer; font-size:13px; color:var(--muted); margin-top:4px; }
+  details.tech pre { white-space:pre-wrap; font-size:12px; background:var(--bg); padding:8px 10px; border-radius:8px; margin:6px 0 0; }
+
   /* bottom bar (summary + next) */
   .banner { background:var(--block-bg); color:var(--block); border-bottom:1px solid #f1c7c2; padding:10px 20px; font-size:14px; font-weight:600; text-align:center; }
   .bottombar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); z-index:1000;
@@ -153,7 +207,7 @@
 <!-- ================= login / registration ================= -->
 <section id="login" hidden>
   <div class="login-card">
-    <div class="brand"><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg> Farm App</div>
+    <div class="brand"><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg> <span class="app-name">Farm App</span></div>
     <h1 id="authTitle">Přihlášení</h1>
     <p class="lead">Přípravky na ochranu rostlin povolené na váš pozemek.</p>
     <div class="tabs" role="tablist">
@@ -177,10 +231,12 @@
 <div id="app" hidden>
   <header class="topbar">
     <div class="topbar-in">
-      <div class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg><span>Farm App</span></div>
+      <div class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg><span class="app-name">Farm App</span></div>
       <nav class="topnav">
         <button id="navWizard" class="active">Vyhodnocení</button>
         <button id="navStock">Můj sklad <span id="stockCount"></span></button>
+        <button id="navRecords">Evidence</button>
+        <button id="navSupport">Podpora</button>
       </nav>
       <div class="spacer"></div>
       <span class="user" id="userName"></span>
@@ -200,7 +256,30 @@
     <div class="field-grid">
       <div id="map"></div>
       <div>
-        <div class="card">
+        <div class="card" style="margin-bottom:16px" id="fieldCard" hidden>
+          <h3>Vybraný pozemek</h3>
+          <div id="fieldInfo"></div>
+        </div>
+        <div class="card" id="myCard">
+          <div id="myEmpty">
+            <h3>Moje pole</h3>
+            <p class="muted" style="margin:0">Zadejte své ID JI z LPIS a aplikace načte všechna vaše pole. Pak je uvidíte v mapě a můžete si je pojmenovat. Nikam se přihlašovat nemusíte, tyto údaje jsou v LPIS veřejné.</p>
+            <label for="jiInput">ID JI (číslo uživatele v LPIS)</label>
+            <input id="jiInput" inputmode="numeric" placeholder="např. 1000123456" autocomplete="off">
+            <button class="btn block" id="jiLoad" style="margin-top:12px">Načíst moje pole</button>
+            <div class="hint">Číslo najdete v Portálu farmáře nebo na výpisu z LPIS. Jednodušší je kliknout v mapě na kterékoli své pole a zvolit „Tohle je moje pole“.</div>
+            <div id="jiErr" class="error"></div>
+          </div>
+          <div id="myHave" hidden>
+            <div class="my-head"><h3>Moje pole <span class="muted" id="myCount"></span></h3><button class="btn ghost small" id="mySetBtn">Nastavení</button></div>
+            <div class="muted" id="myFarmer"></div>
+            <div id="mySettings" class="map-hint" hidden></div>
+            <input id="myFilter" placeholder="Hledat pole podle názvu nebo kódu" autocomplete="off" style="margin-top:10px">
+            <label class="check"><input type="checkbox" id="myOnly" checked> V mapě ukázat jen moje pole</label>
+            <ul class="flist" id="myList"></ul>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
           <h3>Najít podle kódu</h3>
           <div class="row">
             <div><label for="square">Čtverec</label><input id="square" placeholder="550-1150"></div>
@@ -208,10 +287,6 @@
           </div>
           <button class="btn block" id="loadField" style="margin-top:14px">Načíst z LPIS</button>
           <div class="map-hint" id="mapHint">Tip: od přiblížení na úroveň obce se v mapě ukážou hranice dílů. Pak stačí kliknout.</div>
-        </div>
-        <div class="card" style="margin-top:16px" id="fieldCard" hidden>
-          <h3>Vybraný pozemek</h3>
-          <div id="fieldInfo"></div>
         </div>
       </div>
     </div>
@@ -274,6 +349,116 @@
     </div>
   </main>
 
+  <!-- spray records list -->
+  <main class="page" id="records" hidden>
+    <div class="page-head"><h2>Evidence postřiků</h2><p>Záznamy o použití přípravků na ochranu rostlin. Zapište je nejpozději následující pracovní den po aplikaci a uchovávejte aspoň 3 roky.</p></div>
+    <div class="card" id="profileCard" style="margin-bottom:16px"></div>
+    <div class="rec-toolbar">
+      <div><label for="recYear">Rok</label><select id="recYear"></select></div>
+      <div><label for="recFrom">Od</label><input id="recFrom" type="date"></div>
+      <div><label for="recTo">Do</label><input id="recTo" type="date"></div>
+      <div class="grow"></div>
+      <button class="btn ghost" id="recCsv">Stáhnout pro Excel</button>
+      <button class="btn ghost" id="recPrint">Tisk / PDF pro kontrolu</button>
+    </div>
+    <div id="recList"></div>
+  </main>
+
+  <!-- spray record form -->
+  <main class="page" id="recordForm" hidden>
+    <div class="page-head"><h2 id="rfTitle">Nový záznam o postřiku</h2><p>Pole s hvězdičkou je nutné vyplnit hned. Datum sklizně a účinnost můžete doplnit později.</p></div>
+    <form id="rf" novalidate>
+      <div class="card">
+        <h3>Kdy a kde</h3>
+        <div class="form-grid">
+          <div><label class="req" for="rf_app_date">Datum aplikace</label><input id="rf_app_date" type="date"></div>
+          <div><label for="rf_app_time">Čas začátku</label><input id="rf_app_time" type="time"></div>
+          <div></div>
+          <div><label for="rf_square">Čtverec DPB</label><input id="rf_square" placeholder="550-1150"></div>
+          <div><label for="rf_field_code">Zkrácený kód DPB</label><input id="rf_field_code" placeholder="9701/26"></div>
+          <div><label for="rf_cadastral">Katastrální území</label><input id="rf_cadastral" placeholder="např. Jaroměřice"><div class="hint">Najdete v LPIS u dílu. Příště se doplní samo.</div></div>
+          <div class="span2"><label for="rf_parcel">Parcelní číslo (jen u pozemku mimo LPIS)</label><input id="rf_parcel"></div>
+        </div>
+      </div>
+      <div class="card form-section">
+        <h3>Plodina</h3>
+        <div class="form-grid">
+          <div><label class="req" for="rf_crop">Plodina</label><input id="rf_crop" list="cropList"></div>
+          <div><label for="rf_crop_area_ha">Výměra oseté plochy (ha)</label><input id="rf_crop_area_ha" inputmode="decimal"></div>
+          <div><label for="rf_sowing_date">Datum výsevu / výsadby</label><input id="rf_sowing_date" type="date"></div>
+          <div><label for="rf_bbch">Růstová fáze (BBCH)</label><input id="rf_bbch" placeholder="např. 32"></div>
+          <div><label for="rf_crop_end_date">Datum ukončení pěstování (sklizeň)</label><input id="rf_crop_end_date" type="date"><div class="hint">Doplňte po sklizni.</div></div>
+        </div>
+      </div>
+      <div class="card form-section">
+        <h3>Přípravek a dávka</h3>
+        <div class="form-grid">
+          <div class="span2"><label class="req" for="rf_product">Úplný obchodní název přípravku</label><input id="rf_product" list="rfProducts" autocomplete="off"><datalist id="rfProducts"></datalist></div>
+          <div><label for="rf_reg_number">Evidenční číslo přípravku</label><input id="rf_reg_number"></div>
+          <div><label class="req" for="rf_dose">Dávka na jednotku</label><div class="dose-row"><input id="rf_dose" inputmode="decimal" placeholder="0,8"><select id="rf_dose_unit"></select></div><div class="hint" id="rfDoseHint"></div></div>
+          <div><label class="req" for="rf_treated_area_ha">Ošetřená výměra (ha)</label><input id="rf_treated_area_ha" inputmode="decimal"></div>
+          <div><label for="rfTotal">Celkové množství přípravku</label><input id="rfTotal" disabled></div>
+          <div class="span2"><label class="req" for="rf_target">Škodlivý organismus nebo účel (jak je na etiketě)</label><input id="rf_target" list="rfTargets"><datalist id="rfTargets"></datalist></div>
+          <div><label for="rf_tank_mix">Samostatně, nebo ve směsi</label><select id="rf_tank_mix"><option value="S">S: samostatně</option><option value="TM">TM: ve směsi</option></select></div>
+          <div class="span3" id="mixRow" hidden><label for="rf_mix_with">Ve směsi s (přípravky, hnojiva)</label><input id="rf_mix_with"></div>
+          <div><label for="rf_efficacy">Účinnost zásahu</label><select id="rf_efficacy"><option value="">zatím neověřeno</option><option value="1">1: účinný</option><option value="0">0: neúčinný</option></select><div class="hint">Doplňte, až uvidíte výsledek.</div></div>
+        </div>
+      </div>
+      <div class="card form-section">
+        <h3>Technika a poznámky <span class="muted">(nepovinné)</span></h3>
+        <div class="form-grid">
+          <div><label for="rf_applicator">Kdo aplikoval</label><input id="rf_applicator"></div>
+          <div><label for="rf_sprayer">Postřikovač</label><input id="rf_sprayer" placeholder="např. Amazone UX 4200"></div>
+          <div><label for="rf_nozzle">Trysky (redukce úletu)</label><select id="rf_nozzle"><option value="">neuvedeno</option><option value="0">bez redukce</option><option value="50">50 %</option><option value="75">75 %</option><option value="90">90 %</option></select></div>
+          <div><label for="rf_water_l_ha">Množství vody (l/ha)</label><input id="rf_water_l_ha" inputmode="decimal"></div>
+          <div class="span2"><label for="rf_note">Poznámka (počasí, vítr…)</label><input id="rf_note"></div>
+        </div>
+      </div>
+      <div id="rfErr" class="error"></div>
+    </form>
+  </main>
+
+  <!-- support: bug report / feature request / question -->
+  <main class="page" id="support" hidden>
+    <div class="page-head"><h2>Podpora</h2><p>Našli jste chybu, chybí vám nějaká funkce, nebo něčemu nerozumíte? Napište nám.</p></div>
+    <div class="support-grid">
+      <form class="card" id="sf" novalidate>
+        <label>O co jde?</label>
+        <div class="options kinds" id="sfKinds">
+          <button type="button" class="option active" data-v="chyba"><b>Chyba</b><span>něco nefunguje</span></button>
+          <button type="button" class="option" data-v="napad"><b>Nová funkce</b><span>nápad, co přidat</span></button>
+          <button type="button" class="option" data-v="dotaz"><b>Dotaz</b><span>nevím si rady</span></button>
+        </div>
+        <label for="sf_subject">Předmět</label><input id="sf_subject" maxlength="200" placeholder="krátce, např. Nejde načíst pole">
+        <label for="sf_message" class="req">Zpráva</label>
+        <textarea id="sf_message" maxlength="10000"></textarea>
+        <label for="sf_contact">Kam vám máme odpovědět</label><input id="sf_contact" maxlength="200" placeholder="e-mail nebo telefon">
+        <label class="check"><input type="checkbox" id="sf_tech" checked> Přiložit technické údaje (prohlížeč, vybraný pozemek a plodina)</label>
+        <details class="tech"><summary>Co se přiloží</summary><pre id="sfTechPreview"></pre></details>
+        <div id="sfErr" class="error"></div>
+        <div id="sfDone" hidden></div>
+      </form>
+      <div>
+      <div class="card" id="sfSetup" style="margin-bottom:16px" hidden>
+        <h3 style="margin-top:0">Nastavit odesílání na e-mail</h3>
+        <p class="muted" style="margin:0">Jednorázové nastavení. Dokud není hotové, zprávy se jen ukládají v aplikaci.</p>
+        <ol class="muted" style="padding-left:20px;margin:10px 0 0">
+          <li>Otevřete <a href="https://web3forms.com" target="_blank" rel="noopener">web3forms.com</a>, zadejte e-mail, kam mají zprávy chodit, a klikněte na „Create Access Key“.</li>
+          <li>Klíč, který vám přijde e-mailem, vložte sem.</li>
+        </ol>
+        <label for="sfKey">Klíč (Access Key)</label><input id="sfKey" autocomplete="off" placeholder="např. 1a2b3c4d-…">
+        <label for="sfMail">E-mail podpory (nepovinné)</label><input id="sfMail" type="email" placeholder="ukáže se, když odeslání selže">
+        <button class="btn block" id="sfSave" type="button" style="margin-top:14px">Uložit nastavení</button>
+        <div id="sfSetupErr" class="error"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Moje zprávy</h3>
+        <div id="sfList"><p class="muted">Zatím jste nic neposlali.</p></div>
+      </div>
+      </div>
+    </div>
+  </main>
+
   <footer class="bottombar">
     <div class="bottombar-in">
       <button class="btn ghost" id="back" hidden>Zpět</button>
@@ -329,18 +514,20 @@ async function showApp() {
   $("#login").hidden = true; $("#app").hidden = false;
   $("#userName").textContent = me.name || me.email;
   initMap();
+  loadMyFields();
   loadStock();
   loadTopCrops();
   goStep(step);
 }
 
 /* ---------------- wizard state ---------------- */
+function fieldTitle() { const m = myField(field); return m && m.name ? `${m.name} (díl ${field.short_code})` : `Díl ${field.short_code}`; }
 let step = 1, fieldId = null, field = null, crop = "", nozzle = 0, lastResult = null, stock = [], view = "wizard";
 
 function goStep(n) {
   view = "wizard"; step = n;
-  $("#navWizard").classList.add("active"); $("#navStock").classList.remove("active");
-  $("#stepper").hidden = false; $("#stock").hidden = true;
+  hidePages(); $("#navWizard").classList.add("active");
+  $("#stepper").hidden = false;
   [1, 2, 3].forEach(i => { $("#step" + i).hidden = i !== n; });
   $$("#stepper button").forEach(b => {
     const s = +b.dataset.step;
@@ -360,9 +547,23 @@ $("#editStock").onclick = showStock;
 
 function updateBar() {
   const parts = [];
-  if (field) parts.push(`<b>Díl ${esc(field.short_code)}</b> · ${num(field.area_ha)} ha`);
+  if (field) parts.push(`<b>${esc(fieldTitle())}</b> · ${num(field.area_ha)} ha`);
   if (crop) parts.push(`<b>${esc(crop)}</b>`);
   if (fieldId) parts.push(nozzle ? `trysky ${nozzle} %` : "bez redukce úletu");
+  if (view === "records" || view === "form") {
+    $("#back").hidden = view === "records";
+    $("#back").textContent = "Zrušit";
+    $("#sum").innerHTML = view === "records" ? `<b>${recs.length}</b> záznamů v období` : (editingId ? "Úprava záznamu" : "Nový záznam");
+    $("#next").textContent = view === "records" ? "+ Nový záznam" : "Uložit záznam"; $("#next").disabled = false;
+    return;
+  }
+  if (view === "support") {
+    $("#back").hidden = false; $("#back").textContent = "Zpět";
+    $("#sum").innerHTML = "Hlášení chyby, nápad nebo dotaz";
+    $("#next").textContent = "Odeslat zprávu"; $("#next").disabled = sending;
+    return;
+  }
+  $("#back").textContent = "Zpět";
   if (view === "stock") { $("#sum").innerHTML = `<b>${stock.length}</b> přípravků na skladě`; }
   else $("#sum").innerHTML = parts.join(" · ") || "Vyberte pozemek v mapě";
   $("#back").hidden = view === "wizard" && step === 1;
@@ -371,13 +572,16 @@ function updateBar() {
   if (step === 1) { next.textContent = "Pokračovat: plodina"; next.disabled = !fieldId; }
   if (step === 2) { next.textContent = "Vyhodnotit přípravky"; next.disabled = !(fieldId && crop); }
   if (step === 3) { next.textContent = "Nový pozemek"; next.disabled = false; }
-  $("#sub1").textContent = field ? `díl ${field.short_code}` : "vyberte v mapě";
+  $("#sub1").textContent = field ? fieldTitle() : "vyberte v mapě";
   $("#sub2").textContent = crop || "co a čím stříkáte";
   $("#sub3").textContent = lastResult ? `${lastResult.counts.ok + lastResult.counts.warn} použitelných` : "povolené přípravky";
 }
-$("#back").onclick = () => view === "stock" ? goStep(step) : goStep(step - 1);
+$("#back").onclick = () => view === "support" ? goStep(step) : view === "form" ? showRecords() : view === "stock" ? goStep(step) : goStep(step - 1);
 $("#next").onclick = () => {
+  if (view === "support") return sendSupport();
   if (view === "stock") return goStep(step);
+  if (view === "records") { rfContext = null; return openRecordForm({}, null); }
+  if (view === "form") return saveRecord();
   if (step === 1) return goStep(2);
   if (step === 2) return runEvaluation();
   if (step === 3) { lastResult = null; goStep(1); }
@@ -389,16 +593,153 @@ function initMap() {
   if (map) return;
   map = L.map("map").setView([49.8, 15.5], 7);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
-  L.tileLayer.wms("https://mze.gov.cz/public/app/wms/public_DPB_PB_OPV.fcgi", {
+  lpisWms = L.tileLayer.wms("https://mze.gov.cz/public/app/wms/public_DPB_PB_OPV.fcgi", {
     layers: "DPB_UCINNE", format: "image/png", transparent: true, minZoom: 13, attribution: "LPIS © MZe"
   }).addTo(map);
   map.on("click", e => {
+    if (onlyMine()) return;  // only my fields are shown: they handle their own clicks
     if (map.getZoom() >= 13) loadField({ lat: e.latlng.lat, lon: e.latlng.lng });
     else { map.setView(e.latlng, Math.min(map.getZoom() + 3, 14)); }
   });
-  map.on("zoomend", () => {
-    $("#mapHint").textContent = map.getZoom() >= 13 ? "Klikněte na díl v mapě." : "Tip: přibližte mapu. Od úrovně obce se ukážou hranice dílů a stačí kliknout.";
+  map.on("zoomend", updateMapHint);
+  updateMapHint();
+}
+function updateMapHint() {
+  if (!map) return;
+  map.getContainer().classList.toggle("map-far", map.getZoom() < 13);
+  $("#mapHint").textContent = onlyMine() ? "V mapě jsou jen vaše pole. Klikněte na pole, nebo ho vyberte v seznamu."
+    : map.getZoom() >= 13 ? "Klikněte na díl v mapě." : "Tip: přibližte mapu. Od úrovně obce se ukážou hranice dílů a stačí kliknout.";
+}
+
+/* ---------------- my fields ---------------- */
+let myF = { ji: "", farmer: "", fields: [] }, myLayer = null, lpisWms = null, myFilter = "", renaming = null;
+let myOnlyPref = (() => { try { return localStorage.getItem("myOnly") !== "0"; } catch { return true; } })();
+$("#myOnly").checked = myOnlyPref;
+const fkey = f => f.square + "|" + f.short_code;
+const fLabel = f => f.name || `díl ${f.short_code}`;
+const onlyMine = () => myOnlyPref && myF.fields.length > 0;
+const myField = f => f && myF.fields.find(x => x.square === f.square && x.short_code === f.short_code);
+const myMatches = f => { const q = myFilter.trim().toLowerCase();
+  return !q || `${f.name} ${f.short_code} ${f.square} ${f.code} ${f.land_use}`.toLowerCase().includes(q); };
+
+async function loadMyFields() {
+  try { myF = await api("/api/my-fields"); } catch { return; }
+  renderMyFields();
+  if (!fieldId) fitMyFields();
+}
+function setMyData(d) { myF = d; renderMyFields(); fitMyFields(); if (field) showFieldInfo(); }
+async function connectJI(ji, errBox) {
+  const btn = $("#jiLoad"); btn.disabled = true;
+  if (errBox) errBox.innerHTML = '<span class="muted"><span class="spinner"></span>Načítám vaše pole z LPIS…</span>';
+  try { setMyData(await api("/api/my-fields/load", { method: "POST", body: JSON.stringify({ ji }) })); if (errBox) errBox.textContent = ""; }
+  catch (err) { if (errBox) errBox.textContent = err.message; }
+  btn.disabled = false;
+}
+$("#jiLoad").onclick = () => connectJI($("#jiInput").value, $("#jiErr"));
+$("#jiInput").addEventListener("keydown", e => { if (e.key === "Enter") $("#jiLoad").click(); });
+$("#myOnly").onchange = () => {
+  myOnlyPref = $("#myOnly").checked;
+  try { localStorage.setItem("myOnly", myOnlyPref ? "1" : "0"); } catch {}
+  applyOnlyMine();
+};
+let myFilterTimer;
+$("#myFilter").addEventListener("input", () => {
+  myFilter = $("#myFilter").value; renderMyList();
+  clearTimeout(myFilterTimer); myFilterTimer = setTimeout(() => { drawMyFields(); if (myFilter.trim()) fitMyFields(); }, 250);
+});
+$("#myFilter").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const hits = myF.fields.filter(f => myMatches(f) && f.in_lpis);
+  if (hits.length === 1) selectMyField(hits[0]);
+});
+$("#mySetBtn").onclick = () => {
+  const box = $("#mySettings");
+  box.hidden = !box.hidden;
+  box.innerHTML = `ID JI <b>${esc(myF.ji)}</b>${myF.loaded_at ? `, načteno ${new Date(myF.loaded_at).toLocaleDateString("cs-CZ")}` : ""}.
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn small" id="myReload">Znovu načíst z LPIS</button>
+      <button class="btn ghost small" id="myDisc">Odpojit</button></div>
+    <div class="hint">Znovu načtěte, když v LPIS přibude nebo se změní díl. Vaše názvy zůstanou.</div><div class="error" id="myErr"></div>`;
+  $("#myReload").onclick = () => connectJI(myF.ji, $("#myErr"));
+  $("#myDisc").onclick = async () => {
+    if ($("#myDisc").dataset.sure !== "1") { $("#myDisc").dataset.sure = "1"; $("#myDisc").textContent = "Opravdu odpojit? Smaže i názvy polí"; return; }
+    setMyData(await api("/api/my-fields", { method: "DELETE" }));
+  };
+};
+
+function renderMyFields() {
+  const has = myF.fields.length > 0;
+  $("#myEmpty").hidden = has; $("#myHave").hidden = !has;
+  if (!has) { $("#jiInput").value = myF.ji || ""; }
+  else {
+    const ha = myF.fields.filter(f => f.in_lpis).reduce((a, f) => a + (f.area_ha || 0), 0);
+    $("#myCount").textContent = `(${myF.fields.length}, ${num(Math.round(ha * 100) / 100)} ha)`;
+    $("#myFarmer").textContent = myF.farmer ? `Uživatel v LPIS: ${myF.farmer}` : "";
+    $("#mySettings").hidden = true;
+  }
+  renderMyList(); drawMyFields(); applyOnlyMine();
+}
+function renderMyList() {
+  const sel = myField(field), list = myF.fields.filter(myMatches);
+  $("#myList").innerHTML = list.map(f => {
+    const k = fkey(f);
+    if (renaming === k) return `<li data-k="${esc(k)}"><div class="rn"><input id="rnInput" value="${esc(f.name)}" placeholder="např. Za humny" maxlength="60">
+      <button class="btn small" data-save>Uložit</button><button class="btn ghost small" data-cancel>Zrušit</button></div></li>`;
+    return `<li data-k="${esc(k)}" class="${sel && fkey(sel) === k ? "active" : ""}">
+      <button class="fl-main" ${f.in_lpis ? "" : "disabled"}><b>${f.name ? esc(f.name) : `<span class="muted" style="display:inline;font-size:inherit">bez názvu</span>`}</b>
+      <span class="muted">díl ${esc(f.short_code)} · ${esc(f.square)} · ${f.area_ha != null ? num(f.area_ha) + " ha" : ""}${f.land_use ? " · " + esc(f.land_use) : ""}
+      ${f.in_lpis ? "" : ' · <span class="gone">už není v LPIS</span>'}</span></button>
+      <button class="btn ghost small" data-rename>${f.name ? "Přejmenovat" : "Pojmenovat"}</button></li>`;
+  }).join("") || '<li class="muted" style="padding:10px 0">Žádné pole tomu neodpovídá.</li>';
+  $$("#myList li[data-k]").forEach(li => {
+    const f = myF.fields.find(x => fkey(x) === li.dataset.k);
+    const main = li.querySelector(".fl-main"); if (main) main.onclick = () => selectMyField(f);
+    const rb = li.querySelector("[data-rename]"); if (rb) rb.onclick = () => { renaming = li.dataset.k; renderMyList(); const i = $("#rnInput"); i.focus(); i.select(); };
+    const save = async () => {
+      try { myF = await api("/api/my-fields/name", { method: "PUT", body: JSON.stringify({ square: f.square, short_code: f.short_code, name: $("#rnInput").value }) }); }
+      catch (err) { alertBox(err.message); }
+      renaming = null; renderMyList(); drawMyFields(); updateBar(); if (field) showFieldInfo();
+    };
+    const sv = li.querySelector("[data-save]"); if (sv) sv.onclick = save;
+    const cn = li.querySelector("[data-cancel]"); if (cn) cn.onclick = () => { renaming = null; renderMyList(); };
+    const inp = li.querySelector("#rnInput");
+    if (inp) inp.onkeydown = e => { if (e.key === "Enter") save(); if (e.key === "Escape") { renaming = null; renderMyList(); } };
   });
+}
+function alertBox(msg) { const e = $("#mySettings"); e.hidden = false; e.innerHTML = `<span class="error">${esc(msg)}</span>`; }
+
+function drawMyFields() {
+  if (!map) return;
+  if (myLayer) { map.removeLayer(myLayer); myLayer = null; }
+  const sel = myField(field);
+  const feats = myF.fields.filter(f => f.geometry && myMatches(f))
+    .map(f => ({ type: "Feature", geometry: f.geometry, properties: { k: fkey(f) } }));
+  if (!feats.length) return;
+  myLayer = L.geoJSON({ type: "FeatureCollection", features: feats }, {
+    style: ft => sel && ft.properties.k === fkey(sel)
+      ? { color: "#214d29", weight: 4, fillColor: "#2f6b3a", fillOpacity: .35 }
+      : { color: "#c9a227", weight: 2, fillColor: "#e9c94a", fillOpacity: .28 },
+    onEachFeature: (ft, layer) => {
+      const f = myF.fields.find(x => fkey(x) === ft.properties.k);
+      const isSel = sel && fkey(sel) === ft.properties.k;
+      layer.bindTooltip(esc(fLabel(f)), { permanent: true, direction: "center", className: "flabel" + (isSel ? " sel" : "") });
+      layer.on("click", e => { L.DomEvent.stopPropagation(e); selectMyField(f); });
+    }
+  }).addTo(map);  [slopeLayer, waterLayer, fieldLayer].forEach(l => l && l.bringToFront());
+}
+function fitMyFields() {
+  if (!map || !myLayer) return;
+  const b = myLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { maxZoom: 16, padding: [20, 20] });
+}
+function applyOnlyMine() {
+  if (!map || !lpisWms) return;
+  if (onlyMine()) { if (map.hasLayer(lpisWms)) map.removeLayer(lpisWms); }
+  else if (!map.hasLayer(lpisWms)) lpisWms.addTo(map);
+  updateMapHint();
+}
+function selectMyField(f) {
+  if (!f || !f.in_lpis) return;
+  loadField({ square: f.square, code: f.short_code });
 }
 
 async function loadField(params) {
@@ -408,7 +749,7 @@ async function loadField(params) {
   try { data = await api("/api/field?" + new URLSearchParams(params)); }
   catch (err) { $("#fieldInfo").innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
   const f = data.field, c = data.context;
-  field = f; fieldId = String(f.id); lastResult = null;
+  field = f; fieldId = String(f.id); fieldCtx = c; lastResult = null;
   $("#square").value = f.square; $("#code").value = f.short_code;
   [fieldLayer, slopeLayer, waterLayer].forEach(l => l && map.removeLayer(l));
   slopeLayer = waterLayer = null;
@@ -416,10 +757,20 @@ async function loadField(params) {
   if (c.slope_near_water.geometry) slopeLayer = L.geoJSON(c.slope_near_water.geometry, { style: { color: "#a15c00", weight: 1, fillOpacity: .4 } }).addTo(map);
   if (c.water && c.water.geometry) waterLayer = L.geoJSON(c.water.geometry, { style: { color: "#1565c0", weight: 3, fillColor: "#1565c0", fillOpacity: .35 } }).addTo(map);
   map.fitBounds(fieldLayer.getBounds(), { maxZoom: 16 });
+  renderMyList(); drawMyFields();
+  showFieldInfo();
+  goStep(1);
+}
+let fieldCtx = null;
+function showFieldInfo() {
+  const f = field, c = fieldCtx, mine = myField(f);
   const w = c.water || {};
   const waterText = w.found ? `${num(w.min_distance_m)} m (${esc(w.nearest.name)})` : "do 60 m žádná";
   const er = c.erosion;
+  const own = mine ? `<dt>Název</dt><dd><b>${esc(mine.name || "bez názvu")}</b></dd>`
+    : f.user ? `<dt>Uživatel</dt><dd>${esc(f.user)}</dd>` : "";
   $("#fieldInfo").innerHTML = `<dl class="facts">
+    ${own}
     <dt>Díl</dt><dd><b>${esc(f.code)}</b></dd>
     <dt>Výměra</dt><dd>${num(f.area_ha)} ha, ${esc(f.land_use)}</dd>
     <dt>Eroze</dt><dd>${esc(f.erosion || "–")}${er ? ` (SEO ${er.seo_ha} ha, MEO ${er.meo_ha} ha)` : ""}</dd>
@@ -427,8 +778,10 @@ async function loadField(params) {
     <dt>Svah u vody</dt><dd>${c.slope_near_water.intersects ? `<span class="flag warn">ano, ${c.slope_near_water.area_ha} ha</span>` : "ne"}</dd>
     <dt>OPVZ I. st.</dt><dd>${c.opvz1_buffer.intersects ? '<span class="flag warn">v okolí 100 m</span>' : "ne"}</dd>
     <dt>Včelstva</dt><dd>${c.apiaries.count} stanovišť do ${c.apiaries.radius_m / 1000} km</dd>
-  </dl>`;
-  goStep(1);
+  </dl>
+  ${!myF.fields.length && f.ji ? `<button class="btn ghost small" id="itsMine" style="margin-top:12px">Tohle je moje pole: načíst všechna moje pole</button>
+    <div class="hint">Načte všechny díly uživatele ${esc(f.user)} (ID JI ${esc(f.ji)}).</div><div class="error" id="itsMineErr"></div>` : ""}`;
+  const im = $("#itsMine"); if (im) im.onclick = () => { im.disabled = true; connectJI(f.ji, $("#itsMineErr")); };
 }
 $("#loadField").onclick = () => {
   const square = $("#square").value.trim(), code = $("#code").value.trim();
@@ -484,7 +837,7 @@ let resultTab = "all", resultFilter = "";
 function renderResults() {
   const d = lastResult, q = resultFilter.toLowerCase();
   const nOwn = d.products.filter(p => p.owned).length;
-  $("#resultHead").textContent = `Díl ${field.short_code} · ${d.crop} · ${d.nozzle ? "trysky " + d.nozzle + " %" : "bez redukce úletu"}`;
+  $("#resultHead").textContent = `${fieldTitle()} · ${d.crop} · ${d.nozzle ? "trysky " + d.nozzle + " %" : "bez redukce úletu"}`;
   const items = d.products.filter(p => (resultTab === "all" || p.owned) &&
     (!q || (p.product + " " + p.uses.map(u => u.target).join(" ") + " " + p.active_substances.map(a => a.name).join(" ")).toLowerCase().includes(q)));
   const counts = resultTab === "own" ? d.owned_counts : d.counts;
@@ -516,7 +869,10 @@ function renderResults() {
         <div class="pfoot">
           <span class="muted">Povolení do ${esc(p.authorized_until)}, použitelné do ${esc(p.usable_until)}.
             ${p.documents.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">Další informace (PDF)</a>`).join(" · ")}</span>
-          <button class="btn ghost small" data-own="${esc(p.product)}">${p.owned ? "Odebrat ze skladu" : "+ Přidat do skladu"}</button>
+          <span style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn ghost small" data-own="${esc(p.product)}">${p.owned ? "Odebrat ze skladu" : "+ Přidat do skladu"}</button>
+            ${p.level !== "block" ? `<button class="btn small" data-record="${esc(p.product)}">Zapsat postřik</button>` : ""}
+          </span>
         </div>
       </details>`).join("") || (resultTab === "own" && !nOwn ? "" : '<p class="muted">Nic nenalezeno.</p>')}`;
   $$("#results .seg button").forEach(b => b.onclick = () => { resultTab = b.dataset.tab; renderResults(); });
@@ -530,6 +886,7 @@ function renderResults() {
     renderResults();
     if (open) { const el = [...$$("#results [data-own]")].find(x => x.dataset.own === name); el && (el.closest("details").open = true); }
   });
+  $$("#results [data-record]").forEach(b => b.onclick = () => recordFromResult(lastResult.products.find(x => x.product === b.dataset.record)));
   const inp = $("#filter");
   inp.oninput = () => { const pos = inp.selectionStart; resultFilter = inp.value; renderResults(); const n = $("#filter"); n.focus(); n.setSelectionRange(pos, pos); };
 }
@@ -554,8 +911,7 @@ async function addStock(product) { stock = await api("/api/my-products", { metho
 async function removeStock(product) { stock = await api("/api/my-products?" + new URLSearchParams({ product }), { method: "DELETE" }); renderStock(); }
 function showStock() {
   view = "stock";
-  $("#navStock").classList.add("active"); $("#navWizard").classList.remove("active");
-  $("#stepper").hidden = true; [1, 2, 3].forEach(i => $("#step" + i).hidden = true); $("#stock").hidden = false;
+  hidePages(); $("#navStock").classList.add("active"); $("#stock").hidden = false;
   searchProducts(); updateBar(); window.scrollTo(0, 0);
 }
 let pTimer;
@@ -574,8 +930,342 @@ async function searchProducts() {
 $("#pq").addEventListener("input", () => { clearTimeout(pTimer); pTimer = setTimeout(searchProducts, 200); });
 $("#pq").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(pTimer); searchProducts(); } });
 
+/* ---------------- spray records ("evidence") ---------------- */
+let recs = [], recProfile = {}, recUnits = [], editingId = null, rfContext = null;
+const RF = ["app_date", "app_time", "square", "field_code", "parcel", "cadastral", "crop", "crop_area_ha", "sowing_date",
+  "crop_end_date", "treated_area_ha", "product", "reg_number", "dose", "dose_unit", "target", "tank_mix", "mix_with",
+  "bbch", "efficacy", "water_l_ha", "nozzle", "applicator", "sprayer", "note"];
+const czDate = v => v ? new Date(v + "T00:00:00").toLocaleDateString("cs-CZ") : "";
+const czNum = v => v == null || v === "" ? "" : String(v).replace(".", ",");
+const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+
+function hidePages() {
+  [1, 2, 3].forEach(i => $("#step" + i).hidden = true);
+  ["#stock", "#records", "#recordForm", "#support"].forEach(s => $(s).hidden = true);
+  $("#stepper").hidden = true;
+  $$(".topnav button").forEach(b => b.classList.remove("active"));
+}
+
+function recPeriod() {
+  return { date_from: $("#recFrom").value, date_to: $("#recTo").value };
+}
+function initYears() {
+  if ($("#recYear").options.length) return;
+  const y = new Date().getFullYear();
+  $("#recYear").innerHTML = `<option value="">vlastní období</option>` +
+    [y, y - 1, y - 2, y - 3].map(v => `<option value="${v}">${v}</option>`).join("");
+  $("#recYear").value = String(y); setYear();
+}
+function setYear() {
+  const y = $("#recYear").value;
+  if (y) { $("#recFrom").value = `${y}-01-01`; $("#recTo").value = `${y}-12-31`; }
+}
+$("#recYear").onchange = () => { setYear(); loadRecords(); };
+["#recFrom", "#recTo"].forEach(s => $(s).onchange = () => { $("#recYear").value = ""; loadRecords(); });
+
+async function showRecords() {
+  view = "records"; hidePages();
+  $("#navRecords").classList.add("active"); $("#records").hidden = false;
+  initYears(); updateBar(); window.scrollTo(0, 0);
+  await loadRecords();
+}
+$("#navRecords").onclick = showRecords;
+
+async function loadRecords() {
+  $("#recList").innerHTML = '<p class="muted"><span class="spinner"></span>Načítám…</p>';
+  let d;
+  try { d = await api("/api/records?" + new URLSearchParams(recPeriod())); }
+  catch (err) { $("#recList").innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
+  recs = d.records; recProfile = d.profile; recUnits = d.units;
+  renderProfile(false); renderRecords(); updateBar();
+}
+
+function profileOk(p) { return p.name && (p.ico || p.birth_date) && p.address; }
+function renderProfile(edit) {
+  const p = recProfile;
+  if (!edit) {
+    $("#profileCard").innerHTML = `<div class="profile-warn">
+      <div><h3>Údaje o podniku</h3>${profileOk(p)
+        ? `<span>${esc(p.name)}${p.ico ? " · IČO " + esc(p.ico) : ""}${p.birth_date ? " · nar. " + czDate(p.birth_date) : ""} · ${esc(p.address)}</span>`
+        : `<span class="flag warn">chybí</span> <span class="muted">Do záznamů patří jméno nebo název, IČO (nebo datum narození) a adresa.</span>`}</div>
+      <button class="btn ghost small" id="editProfile">${profileOk(p) ? "Upravit" : "Vyplnit"}</button></div>`;
+    $("#editProfile").onclick = () => renderProfile(true);
+    return;
+  }
+  $("#profileCard").innerHTML = `<h3>Údaje o podniku</h3>
+    <div class="form-grid">
+      <div class="span2"><label for="pf_name">Jméno a příjmení, nebo název firmy</label><input id="pf_name" value="${esc(p.name)}"></div>
+      <div><label for="pf_ico">IČO</label><input id="pf_ico" value="${esc(p.ico)}" inputmode="numeric"></div>
+      <div class="span2"><label for="pf_address">Adresa (místo podnikání nebo sídlo)</label><input id="pf_address" value="${esc(p.address)}"></div>
+      <div><label for="pf_birth">Datum narození (jen bez IČO)</label><input id="pf_birth" type="date" value="${esc(p.birth_date)}"></div>
+    </div>
+    <div class="rec-actions"><button class="btn small" id="saveProfile">Uložit</button><button class="btn ghost small" id="cancelProfile">Zrušit</button></div>
+    <div class="error" id="pfErr"></div>`;
+  $("#cancelProfile").onclick = () => renderProfile(false);
+  $("#saveProfile").onclick = async () => {
+    try {
+      recProfile = await api("/api/farm", { method: "PUT", body: JSON.stringify({
+        name: $("#pf_name").value, ico: $("#pf_ico").value, address: $("#pf_address").value, birth_date: $("#pf_birth").value }) });
+      await loadRecords();
+    } catch (err) { $("#pfErr").textContent = err.message; }
+  };
+}
+
+function renderRecords() {
+  if (!recs.length) {
+    $("#recList").innerHTML = `<div class="card"><p style="margin:0">V tomto období zatím nemáte žádný záznam.
+      Záznam nejsnáz vytvoříte z vyhodnocení: u přípravku klikněte na <b>Zapsat postřik</b>. Nebo použijte tlačítko <b>Nový záznam</b> dole.</p></div>`;
+    return;
+  }
+  $("#recList").innerHTML = recs.map(r => {
+    const place = r.square ? `díl ${esc(r.field_code)} (${esc(r.square)})` : `parcela ${esc(r.parcel)}`;
+    const todo = r.missing.filter(m => m !== "údaje o podniku");
+    return `<div class="rec">
+      <div class="rec-head">
+        <span><span class="date">${czDate(r.app_date)}${r.app_time ? " " + esc(r.app_time) : ""}</span> · ${place}${r.cadastral ? ", k. ú. " + esc(r.cadastral) : ""} · ${esc(r.crop)}</span>
+        <span class="flags">${r.tank_mix === "TM" ? '<span class="flag own">směs</span> ' : ""}${r.efficacy === "1" ? '<span class="flag ok">účinný</span>' : r.efficacy === "0" ? '<span class="flag block">neúčinný</span>' : ""}</span>
+      </div>
+      <dl class="facts">
+        <dt>Přípravek</dt><dd><b>${esc(r.product)}</b>${r.reg_number ? ` <span class="muted">ev. č. ${esc(r.reg_number)}</span>` : ""}</dd>
+        <dt>Dávka</dt><dd>${czNum(r.dose)} ${esc(r.dose_unit)} na ${czNum(r.treated_area_ha)} ha${r.total_amount ? ` = <b>${esc(r.total_amount)}</b>` : ""}</dd>
+        <dt>Proti</dt><dd>${esc(r.target)}</dd>
+        ${r.bbch ? `<dt>BBCH</dt><dd>${esc(r.bbch)}</dd>` : ""}
+      </dl>
+      ${todo.length ? `<div class="todo">Doplňte: ${todo.map(esc).join(", ")}</div>` : ""}
+      <div class="rec-actions">
+        <button class="btn ghost small" data-edit="${r.id}">Upravit / doplnit</button>
+        <button class="btn ghost small" data-copy="${r.id}">Kopírovat na další díl</button>
+        <button class="btn ghost small" data-del="${r.id}">Smazat</button>
+      </div>
+    </div>`;
+  }).join("");
+  $$("#recList [data-edit]").forEach(b => b.onclick = () => openRecordForm(recs.find(r => r.id === +b.dataset.edit), b.dataset.edit));
+  $$("#recList [data-copy]").forEach(b => b.onclick = () => {
+    const r = recs.find(x => x.id === +b.dataset.copy);
+    openRecordForm({ ...r, square: "", field_code: "", parcel: "", cadastral: "", crop_area_ha: null, sowing_date: "",
+      treated_area_ha: null, crop_end_date: "", efficacy: "" }, null);
+  });
+  $$("#recList [data-del]").forEach(b => b.onclick = async () => {
+    const r = recs.find(x => x.id === +b.dataset.del);
+    if (!confirm(`Smazat záznam ${czDate(r.app_date)}, ${r.product}?`)) return;
+    await api("/api/records/" + r.id, { method: "DELETE" });
+    loadRecords();
+  });
+}
+$("#recCsv").onclick = () => { location.href = "/api/records/export.csv?" + new URLSearchParams(recPeriod()); };
+$("#recPrint").onclick = () => { window.open("/records/print?" + new URLSearchParams(recPeriod()), "_blank"); };
+
+/* --- record form --- */
+function parseDose(text) {
+  // "0,8 l/ha", "0.6-0.8 l/ha", "1,5 kg/ha" -> {dose, unit}
+  const m = String(text || "").replace(/\s+/g, " ").match(/(\d+(?:[.,]\d+)?)(?:\s*[-–]\s*(\d+(?:[.,]\d+)?))?\s*(ml|l|kg|g)\s*\/\s*(ha|t|m3)/i);
+  if (!m) return null;
+  return { dose: m[1].replace(".", ","), unit: `${m[3].toLowerCase()}/${m[4].toLowerCase()}` };
+}
+
+function fillForm(r) {
+  RF.forEach(k => { const el = $("#rf_" + k); if (el) el.value = r[k] == null ? "" : (typeof r[k] === "number" ? czNum(r[k]) : r[k]); });
+  $("#rf_dose_unit").value = r.dose_unit || "l/ha";
+  $("#rf_tank_mix").value = r.tank_mix || "S";
+  $("#rf_nozzle").value = r.nozzle == null ? "" : String(r.nozzle);
+  $("#mixRow").hidden = $("#rf_tank_mix").value !== "TM";
+  updateTotal();
+}
+
+function openRecordForm(r, id) {
+  view = "form"; editingId = id ? +id : null; hidePages();
+  $("#navRecords").classList.add("active"); $("#recordForm").hidden = false; $("#rfErr").textContent = "";
+  $("#rfTitle").textContent = editingId ? "Upravit záznam" : "Nový záznam o postřiku";
+  if (!recUnits.length) recUnits = ["l/ha", "ml/ha", "kg/ha", "g/ha", "l/t", "ml/t", "kg/t", "g/t", "l/m3", "ml/m3", "kg/m3", "g/m3"];
+  $("#rf_dose_unit").innerHTML = recUnits.map(u => `<option>${u}</option>`).join("");
+  if (!id) rfContext = rfContext && r.product === rfContext.product ? rfContext : null;
+  $("#rfTargets").innerHTML = rfContext ? [...new Set(rfContext.uses.map(u => u.target))].map(t => `<option value="${esc(t)}">`).join("") : "";
+  $("#rfDoseHint").textContent = rfContext ? "Podle registru: " + [...new Set(rfContext.uses.map(u => u.dose))].slice(0, 3).join("; ") : "";
+  fillForm({ app_date: today(), tank_mix: "S", ...r });
+  updateBar(); window.scrollTo(0, 0);
+}
+
+async function recordFromResult(p) {
+  rfContext = p;
+  const dose = parseDose(p.uses[0] && p.uses[0].dose) || {};
+  const r = {
+    app_date: today(), square: field.square, field_code: field.short_code, crop: lastResult.crop,
+    crop_area_ha: field.area_ha, treated_area_ha: field.area_ha, product: p.product,
+    reg_number: p.reg_number, dose: dose.dose || "", dose_unit: dose.unit || "l/ha",
+    target: p.uses.length === 1 ? p.uses[0].target : "", nozzle: lastResult.nozzle, tank_mix: "S",
+  };
+  try { Object.assign(r, Object.fromEntries(Object.entries(await api("/api/records/prefill?" +
+    new URLSearchParams({ square: field.square, code: field.short_code, crop: lastResult.crop }))).filter(([, v]) => v !== "" && v != null))); }
+  catch (err) { /* prefill is optional */ }
+  openRecordForm(r, null);
+}
+
+function formData() {
+  const d = {};
+  RF.forEach(k => { const el = $("#rf_" + k); if (el) d[k] = el.value; });
+  return d;
+}
+function updateTotal() {
+  const dose = parseFloat($("#rf_dose").value.replace(",", ".")), area = parseFloat($("#rf_treated_area_ha").value.replace(",", "."));
+  const unit = $("#rf_dose_unit").value;
+  if (!(dose > 0 && area > 0) || !unit.endsWith("/ha")) { $("#rfTotal").value = ""; return; }
+  let total = dose * area, base = unit.split("/")[0];
+  if (base === "ml" && total >= 1000) { total /= 1000; base = "l"; }
+  if (base === "g" && total >= 1000) { total /= 1000; base = "kg"; }
+  $("#rfTotal").value = `${czNum(Math.round(total * 1000) / 1000)} ${base}`;
+}
+["#rf_dose", "#rf_treated_area_ha", "#rf_dose_unit"].forEach(s => $(s).addEventListener("input", updateTotal));
+$("#rf_tank_mix").onchange = () => { $("#mixRow").hidden = $("#rf_tank_mix").value !== "TM"; };
+let rfTimer;
+$("#rf_product").addEventListener("input", () => {
+  clearTimeout(rfTimer);
+  rfTimer = setTimeout(async () => {
+    const q = $("#rf_product").value.trim();
+    if (q.length < 2) return;
+    try {
+      const list = await api("/api/products?q=" + encodeURIComponent(q));
+      $("#rfProducts").innerHTML = list.map(p => `<option value="${esc(p.product)}">`).join("");
+    } catch (err) { /* registry missing: free text is fine */ }
+  }, 200);
+});
+$("#rf").onsubmit = e => { e.preventDefault(); saveRecord(); };
+
+async function saveRecord() {
+  $("#rfErr").textContent = ""; $("#next").disabled = true;
+  try {
+    const body = JSON.stringify(formData());
+    if (editingId) await api("/api/records/" + editingId, { method: "PUT", body });
+    else await api("/api/records", { method: "POST", body });
+    rfContext = null;
+    await showRecords();
+  } catch (err) { $("#rfErr").textContent = err.message; $("#next").disabled = false; }
+}
+
+/* ---------------- support ("Podpora") ---------------- */
+let sfKind = "chyba", sending = false, appMeta = {}, sfMsgs = [];
+const SF_HINTS = {
+  chyba: "Co jste dělali, co se stalo a co jste čekali? Např.: Na kroku Plodina jsem vybral pšenici ozimou, po kliknutí na Vyhodnotit se nic nestalo.",
+  napad: "Co by vám aplikace měla umět a k čemu by vám to pomohlo?",
+  dotaz: "Na co se chcete zeptat?",
+};
+function setKind(k) {
+  sfKind = k;
+  $$("#sfKinds .option").forEach(b => b.classList.toggle("active", b.dataset.v === k));
+  $("#sf_message").placeholder = SF_HINTS[k];
+  $("#sf_tech").checked = k === "chyba";
+  updateTechPreview();
+}
+$$("#sfKinds .option").forEach(b => b.onclick = () => setKind(b.dataset.v));
+const VIEW_NAMES = { wizard: "Vyhodnocení", stock: "Můj sklad", records: "Evidence", form: "Záznam o postřiku", support: "Podpora" };
+let supportFrom = "wizard";
+function techInfo() {
+  const lines = [
+    `Aplikace: ${appMeta.app_name || ""}`,
+    `Stránka: ${VIEW_NAMES[supportFrom] || supportFrom}${supportFrom === "wizard" ? `, krok ${step}` : ""}`,
+    field ? `Pozemek: ${field.short_code} ${field.square || ""} (${num(field.area_ha)} ha)` : "Pozemek: nevybrán",
+    `Plodina: ${crop || "nevybrána"}`,
+    `Trysky: ${nozzle ? nozzle + " %" : "bez redukce"}`,
+    `Registr přípravků: ${appMeta.registry_ready ? (appMeta.registry_date || "ano") : "nestažený"}`,
+    `Prohlížeč: ${navigator.userAgent}`,
+    `Okno: ${window.innerWidth}×${window.innerHeight}`,
+    `Čas: ${new Date().toLocaleString("cs-CZ")}`,
+  ];
+  return lines.join("\n");
+}
+function updateTechPreview() { $("#sfTechPreview").textContent = techInfo(); }
+$("#sf_tech").onchange = updateTechPreview;
+async function showSupport() {
+  if (view !== "support") supportFrom = view;
+  view = "support"; hidePages();
+  $("#navSupport").classList.add("active"); $("#support").hidden = false;
+  if (!$("#sf_contact").value && me) $("#sf_contact").value = me.email;
+  $("#sfErr").textContent = "";
+  $("#sfSetup").hidden = !!appMeta.support_ready;
+  setKind(sfKind); updateBar(); window.scrollTo(0, 0);
+  loadSupport();
+}
+$("#navSupport").onclick = showSupport;
+$("#sfSave").onclick = async () => {
+  $("#sfSetupErr").textContent = "";
+  try {
+    const r = await api("/api/support/setup", { method: "POST", body: JSON.stringify({ key: $("#sfKey").value, email: $("#sfMail").value }) });
+    Object.assign(appMeta, r); $("#sfSetup").hidden = true; $("#sfKey").value = "";
+    $("#sfDone").hidden = false;
+    $("#sfDone").innerHTML = '<div class="notice ok"><b>Hotovo, zprávy teď budou chodit na e-mail.</b> Zkuste poslat první zkušební zprávu.</div>';
+    renderSupportList();
+  } catch (err) { $("#sfSetupErr").textContent = err.message; }
+};
+$("#sf").onsubmit = e => { e.preventDefault(); sendSupport(); };
+$("#sf_message").oninput = () => { $("#sfDone").hidden = true; };
+
+async function loadSupport() {
+  try { sfMsgs = await api("/api/support"); } catch (err) { return; }
+  renderSupportList();
+}
+function renderSupportList() {
+  if (!sfMsgs.length) { $("#sfList").innerHTML = '<p class="muted">Zatím jste nic neposlali.</p>'; return; }
+  $("#sfList").innerHTML = sfMsgs.map(m => {
+    const when = new Date(m.created_at).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const st = m.sent_at ? '<span class="st sent">✓ odesláno</span>'
+      : `<span class="st wait">jen uloženo${appMeta.support_ready ? ` · <a href="#" data-resend="${m.id}">odeslat znovu</a>` : ""}</span>`;
+    return `<div class="smsg"><div class="top"><b>${esc(m.kind_label)}: ${esc(m.subject)}</b>${st}</div>
+      <div class="muted">${esc(when)}</div><p>${esc(m.message)}</p></div>`;
+  }).join("");
+  $$("#sfList [data-resend]").forEach(a => a.onclick = async e => {
+    e.preventDefault(); a.textContent = "odesílám…";
+    try { await deliver(await api(`/api/support/${a.dataset.resend}/payload`), +a.dataset.resend); }
+    catch (err) { /* status stays "jen uloženo" */ }
+    loadSupport();
+  });
+}
+
+/* Sends the e-mail through Web3Forms straight from the browser and tells the app whether it worked. */
+async function deliver(payload, id) {
+  let ok = false, error = "";
+  try {
+    const r = await fetch("https://api.web3forms.com/submit", {
+      method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify(payload),
+    });
+    const d = await r.json().catch(() => ({}));
+    ok = r.ok && d.success !== false; if (!ok) error = d.message || `chyba ${r.status}`;
+  } catch (err) { error = "Nepodařilo se spojit se službou pro odesílání e-mailů."; }
+  await api(`/api/support/${id}/result`, { method: "POST", body: JSON.stringify({ ok, error }) }).catch(() => {});
+  return ok;
+}
+
+async function sendSupport() {
+  if (sending) return;
+  $("#sfErr").textContent = "";
+  if (!$("#sf_message").value.trim()) { $("#sfErr").textContent = "Napište prosím zprávu."; $("#sf_message").focus(); return; }
+  sending = true; updateBar(); $("#next").textContent = "Odesílám…";
+  try {
+    const body = { kind: sfKind, subject: $("#sf_subject").value, message: $("#sf_message").value,
+                   contact: $("#sf_contact").value, tech: $("#sf_tech").checked ? techInfo() : "" };
+    const res = await api("/api/support", { method: "POST", body: JSON.stringify(body) });
+    const ok = res.send ? await deliver(res.send, res.message.id) : false;
+    const mail = appMeta.support_email ? ` Pokud spěcháte, napište na <a href="mailto:${esc(appMeta.support_email)}">${esc(appMeta.support_email)}</a>.` : "";
+    $("#sfDone").hidden = false;
+    $("#sfDone").innerHTML = ok
+      ? '<div class="notice ok"><b>Děkujeme, zpráva je odeslaná.</b> Ozveme se na kontakt, který jste uvedli.</div>'
+      : res.send
+        ? `<div class="notice warn"><b>Zprávu jsme uložili, ale e-mail se teď nepodařilo odeslat.</b> Můžete to zkusit později v seznamu Moje zprávy (odkaz „odeslat znovu“).${mail}</div>`
+        : `<div class="notice warn"><b>Zprávu jsme uložili v aplikaci.</b> Odesílání e-mailem zatím není nastavené.${mail}</div>`;
+    $("#sf_subject").value = ""; $("#sf_message").value = "";
+    $("#sfDone").scrollIntoView({ behavior: "smooth", block: "center" });
+    loadSupport();
+  } catch (err) { $("#sfErr").textContent = err.message; }
+  sending = false; updateBar();
+}
+
+function applyAppName(m) {
+  if (!m.app_name) return;
+  $$(".app-name").forEach(e => e.textContent = m.app_name);
+  document.title = `${m.app_name} – ${m.app_tagline || ""}`;
+}
+
 /* ---------------- start ---------------- */
 fetch("/api/meta").then(r => r.json()).then(m => {
+  appMeta = m; applyAppName(m);
   if (!m.registry_ready) { $("#regBanner").textContent = m.message; $("#regBanner").hidden = false; }
   if (m.registry_date) $("#regdate").textContent = "Registr přípravků ÚKZÚZ ke dni " + new Date(m.registry_date).toLocaleDateString("cs-CZ") + ".";
 });

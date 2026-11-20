@@ -17,7 +17,10 @@ Webová aplikace, která pro díl půdního bloku z LPIS a zvolenou plodinu vyp�
   - konec povolení a lhůtu pro spotřebování zásob.
 - Výsledek rozdělí na „lze použít“, „s podmínkou“ a „nelze“.
 - Uživatel se registruje e-mailem a heslem (účty se ukládají do `data/users.sqlite`). Ve „Mém skladu“ si vede nakoupené přípravky; ty se ve výsledku zobrazí jako první a dají se zobrazit samostatně.
+- **Moje pole:** uživatel zadá své ID JI (číslo uživatele v LPIS), nebo klikne v mapě na kterékoli své pole a zvolí „Tohle je moje pole“. Aplikace načte z veřejného LPIS všechny jeho díly, zvýrazní je v mapě a ukáže u nich názvy. Pole si může pojmenovat (např. „Za humny“), vyhledat podle názvu nebo kódu a vybrat kliknutím. Volba „V mapě ukázat jen moje pole“ skryje cizí díly. Přihlašovat se do eAGRI není potřeba: ID JI uživatele je u každého dílu ve veřejné WFS službě LPIS. Názvy se ukládají do `data/users.sqlite` a po novém načtení z LPIS zůstanou.
+- **Podpora:** v horní liště je stránka „Podpora“ s formulářem pro nahlášení chyby, návrh nové funkce nebo dotaz. Zpráva se vždy uloží do `data/users.sqlite` a zároveň se odešle e-mailem přes bezplatnou službu [Web3Forms](https://web3forms.com). K chybě se dají přiložit technické údaje (prohlížeč, vybraný pozemek a plodina). Uživatel vidí své zprávy a ty neodeslané může odeslat znovu.
 - Rozhraní je průvodce ve třech krocích: 1. pozemek (velká mapa), 2. plodina a trysky, 3. výsledek.
+- **Evidence postřiků:** záznam o použití přípravku se vytvoří přímo z výsledku (tlačítko „Zapsat postřik“) s předvyplněným pozemkem, plodinou, přípravkem, evidenčním číslem a dávkou, nebo ručně. Záznam obsahuje údaje podle § 11 odst. 1 vyhlášky č. 132/2018 Sb. (ve znění vyhlášky č. 200/2023 Sb.): identifikaci podniku, čtverec a kód DPB, katastrální území, výměru a datum výsevu plodiny, datum aplikace, ošetřenou výměru, název přípravku, dávku na jednotku, škodlivý organismus, samostatně/směs (S/TM), účinnost (1/0) a datum ukončení pěstování. Navíc evidenční číslo přípravku, BBCH a čas aplikace podle nařízení (EU) 2023/564. U každého záznamu aplikace ukáže, co ještě chybí doplnit. Přehled se filtruje podle roku nebo období a jde stáhnout pro Excel (CSV) nebo vytisknout či uložit jako PDF pro kontrolu.
 
 ## Zdroje dat
 
@@ -57,6 +60,13 @@ Aplikace běží jen u vás na počítači a otevírá se v prohlížeči. Potř
 2. V prohlížeči otevřete http://localhost:8000.
 3. Aplikaci ukončíte zavřením okna příkazového řádku.
 
+**Nová verze aplikace**
+
+1. Ukončete aplikaci (zavřete okno příkazového řádku).
+2. Stáhněte z GitHubu znovu ZIP (**Code → Download ZIP**) a rozbalte ho do nové složky.
+3. Ze staré složky zkopírujte celou složku `data` do nové složky (přepište). Jsou v ní vaše účty, sklad, evidence postřiků a stažený registr. Bez ní by se vše ztratilo.
+4. V nové složce otevřete příkazový řádek a spusťte aplikaci jako obvykle.
+
 Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python -m app.registry_import`.
 
 ## Známá omezení
@@ -66,6 +76,7 @@ Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python 
 - **Kódy plodin:** veřejná služba neobsahuje číselník plodin. Přiřazení kódů k názvům odhaduje `build_crops` v `app/registry_import.py` z textů v registru.
 - **Načtení pozemku** trvá 15–25 s, protože se postupně dotazuje několik vrstev LPIS. Služba MZe občas požadavek odmítne, proto ho aplikace zkouší opakovaně.
 - Plodina na pozemku není ve veřejném LPIS. Zadává ji uživatel.
+- **Evidence:** export do formátu XML pro Jednotné úložiště dat evidence POR (povinné jen pro podniky nad 200 ha orné půdy, vinic, chmelnic a sadů) zatím není. Katastrální území veřejný LPIS nevrací, zadává se ručně (u dalšího záznamu na stejném dílu se předvyplní).
 
 ## Struktura
 
@@ -73,5 +84,11 @@ Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python 
 - `app/lpis.py`: dotazy na LPIS WFS a prostorové kontroly
 - `app/evaluate.py`: vyhodnocení přípravků pro pozemek a plodinu
 - `app/main.py`: API (FastAPI)
+- `app/records.py`: evidence postřiků, export do CSV a tisková sestava
 - `app/users.py`: účty, přihlášení (heslo hashované scryptem, cookie) a sklad přípravků; ukládá se do `data/users.sqlite`
 - `app/static/index.html`: webové rozhraní (Leaflet). Fotka na přihlašovací obrazovce: James Baltz, [Unsplash](https://unsplash.com/photos/agricultural-sprayers-in-green-corn-field-jAt6cN6zl8M) (licence Unsplash).
+
+## Nastavení: název aplikace a e-mail pro podporu
+
+- **Název aplikace** je v souboru `app/config.py` (`APP_NAME`). Po změně se nový název ukáže v hlavičce, na přihlašovací stránce, v záložce prohlížeče i na tiskové sestavě.
+- **Odesílání zpráv z Podpory na e-mail** se nastaví přímo v aplikaci: na stránce Podpora je karta „Nastavit odesílání na e-mail“. Na [web3forms.com](https://web3forms.com) zadáte e-mail, kam mají zprávy chodit, klíč z e-mailu vložíte do aplikace a uložíte. Klíč se uloží do `data/nastaveni.json`, tedy jen u vás na počítači (není v gitu ani na GitHubu) a při aktualizaci se přenese se složkou `data`. Dokud klíč není nastavený, zprávy se jen ukládají v aplikaci.
