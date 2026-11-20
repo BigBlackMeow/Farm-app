@@ -7,12 +7,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response as RawResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import evaluate as ev
 from . import lpis
+from . import records as rec
 from . import users
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -34,6 +35,7 @@ def registry():
 
 _fields: dict[str, dict] = {}  # field id -> {"field", "ctx"}; in-memory cache
 store = users.Store()
+records = rec.Records(store)
 COOKIE = "farm_session"
 
 
@@ -168,6 +170,83 @@ def evaluate(field_id: str, crop: str, nozzle: int = 0, user: dict = Depends(cur
         return ev.evaluate(con, entry["ctx"], crop, nozzle, owned=set(store.products(user["id"])))
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+
+# --- spray records ("evidence postřiků") --------------------------------------------------------
+def _period(date_from: str, date_to: str) -> str:
+    if date_from and date_to:
+        return f"{rec.cz_date(date_from)} – {rec.cz_date(date_to)}"
+    if date_from:
+        return f"od {rec.cz_date(date_from)}"
+    if date_to:
+        return f"do {rec.cz_date(date_to)}"
+    return "všechny záznamy"
+
+
+@app.get("/api/farm")
+def farm_profile(user: dict = Depends(current_user)):
+    return records.profile(user["id"])
+
+
+@app.put("/api/farm")
+def save_farm_profile(body: dict, user: dict = Depends(current_user)):
+    try:
+        return records.save_profile(user["id"], body)
+    except rec.RecordError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/records")
+def list_records(date_from: str = "", date_to: str = "", user: dict = Depends(current_user)):
+    return {"records": records.list(user["id"], date_from, date_to), "profile": records.profile(user["id"]),
+            "units": rec.DOSE_UNITS}
+
+
+@app.get("/api/records/prefill")
+def record_prefill(square: str, code: str, crop: str = "", user: dict = Depends(current_user)):
+    return records.last_for_field(user["id"], square, code, crop)
+
+
+@app.post("/api/records")
+def add_record(body: dict, user: dict = Depends(current_user)):
+    try:
+        return records.add(user["id"], body)
+    except rec.RecordError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.put("/api/records/{rec_id}")
+def update_record(rec_id: int, body: dict, user: dict = Depends(current_user)):
+    try:
+        return records.update(user["id"], rec_id, body)
+    except rec.RecordError as e:
+        raise HTTPException(400, str(e))
+    except KeyError:
+        raise HTTPException(404, "Záznam nenalezen.")
+
+
+@app.delete("/api/records/{rec_id}")
+def delete_record(rec_id: int, user: dict = Depends(current_user)):
+    records.delete(user["id"], rec_id)
+    return {"ok": True}
+
+
+@app.get("/api/records/export.csv")
+def export_records_csv(date_from: str = "", date_to: str = "", user: dict = Depends(current_user)):
+    data = rec.to_csv(records.list(user["id"], date_from, date_to), records.profile(user["id"]))
+    name = "evidence-postriku" + (f"-{date_from}" if date_from else "") + (f"-{date_to}" if date_to else "") + ".csv"
+    return RawResponse(data.encode("utf-8"), media_type="text/csv; charset=utf-8",
+                       headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.get("/records/print", response_class=HTMLResponse)
+def print_records(request: Request, date_from: str = "", date_to: str = ""):
+    user = store.user_for_token(request.cookies.get(COOKIE))
+    if user is None:
+        return HTMLResponse('<p>Přihlaste se. <a href="/">Zpět do aplikace</a></p>', status_code=401)
+    return rec.to_print_html(records.list(user["id"], date_from, date_to), records.profile(user["id"]),
+                             _period(date_from, date_to))
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
