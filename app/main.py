@@ -6,18 +6,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from . import evaluate as ev
 from . import lpis
+from . import users
 
 STATIC = Path(__file__).resolve().parent / "static"
 
 app = FastAPI(title="Farm App – přípravky na pozemek")
 con = ev.connect()
 _fields: dict[str, dict] = {}  # field id -> {"field", "ctx"}; in-memory cache
+store = users.Store()
+COOKIE = "farm_session"
 
 
 @app.get("/")
@@ -25,19 +29,100 @@ def index():
     return FileResponse(STATIC / "index.html")
 
 
+# --- login -------------------------------------------------------------------------------------
+class Credentials(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+
+
+def current_user(request: Request) -> dict:
+    user = store.user_for_token(request.cookies.get(COOKIE))
+    if user is None:
+        raise HTTPException(401, "Přihlaste se.")
+    return user
+
+
+def _set_cookie(request: Request, response: Response, token: str) -> None:
+    response.set_cookie(COOKIE, token, max_age=users.SESSION_DAYS * 86400, httponly=True, samesite="lax",
+                        secure=request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https")
+
+
+@app.post("/api/register")
+def register(body: Credentials, request: Request, response: Response):
+    try:
+        s = store.register(body.email, body.password, body.name)
+    except users.AuthError as e:
+        raise HTTPException(400, str(e))
+    _set_cookie(request, response, s["token"])
+    return s["user"]
+
+
+@app.post("/api/login")
+def login(body: Credentials, request: Request, response: Response):
+    try:
+        s = store.login(body.email, body.password)
+    except users.AuthError as e:
+        raise HTTPException(400, str(e))
+    _set_cookie(request, response, s["token"])
+    return s["user"]
+
+
+@app.post("/api/logout")
+def logout(request: Request, response: Response):
+    store.logout(request.cookies.get(COOKIE))
+    response.delete_cookie(COOKIE)
+    return {"ok": True}
+
+
+@app.get("/api/me")
+def me(user: dict = Depends(current_user)):
+    return user
+
+
+# --- my purchased products ("můj sklad") --------------------------------------------------------
+class ProductName(BaseModel):
+    product: str
+
+
+@app.get("/api/products")
+def products(q: str = "", user: dict = Depends(current_user)):
+    return ev.search_products(con, q.strip())
+
+
+@app.get("/api/my-products")
+def my_products(user: dict = Depends(current_user)):
+    return ev.product_info(con, store.products(user["id"]))
+
+
+@app.post("/api/my-products")
+def add_my_product(body: ProductName, user: dict = Depends(current_user)):
+    if not ev.product_info(con, [body.product])[0]["known"]:
+        raise HTTPException(400, "Přípravek v registru není.")
+    store.add_product(user["id"], body.product)
+    return ev.product_info(con, store.products(user["id"]))
+
+
+@app.delete("/api/my-products")
+def remove_my_product(product: str, user: dict = Depends(current_user)):
+    store.remove_product(user["id"], product)
+    return ev.product_info(con, store.products(user["id"]))
+
+
+# --- fields and evaluation ----------------------------------------------------------------------
 @app.get("/api/meta")
 def meta():
     return {"registry_date": ev.registry_date(con)}
 
 
 @app.get("/api/crops")
-def crops(q: str = ""):
+def crops(q: str = "", user: dict = Depends(current_user)):
     return ev.list_crops(con, q)
 
 
 @app.get("/api/field")
 def field(square: str | None = None, code: str | None = None,
-          lat: float | None = None, lon: float | None = None):
+          lat: float | None = None, lon: float | None = None, user: dict = Depends(current_user)):
     try:
         if square and code:
             f = lpis.field_by_code(square, code)
@@ -55,14 +140,14 @@ def field(square: str | None = None, code: str | None = None,
 
 
 @app.get("/api/evaluate")
-def evaluate(field_id: str, crop: str, nozzle: int = 0):
+def evaluate(field_id: str, crop: str, nozzle: int = 0, user: dict = Depends(current_user)):
     if nozzle not in (0, 50, 75, 90):
         raise HTTPException(400, "Redukce úletu musí být 0, 50, 75 nebo 90 %.")
     entry = _fields.get(field_id)
     if entry is None:
         raise HTTPException(404, "Nejdřív načtěte pozemek.")
     try:
-        return ev.evaluate(con, entry["ctx"], crop, nozzle)
+        return ev.evaluate(con, entry["ctx"], crop, nozzle, owned=set(store.products(user["id"])))
     except ValueError as e:
         raise HTTPException(400, str(e))
 

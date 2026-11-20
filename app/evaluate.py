@@ -38,6 +38,34 @@ def list_crops(con, q: str = "", limit: int = 30) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def search_products(con, q: str = "", limit: int = 30, today: date | None = None) -> list[dict]:
+    """Products still usable today whose name or active substance matches `q` (for "můj sklad")."""
+    iso = (today or date.today()).isoformat()
+    rows = con.execute(
+        """SELECT product, MIN(function) AS function, MIN(active_substances) AS subs, MAX(usable_until) AS until
+           FROM decisions WHERE usable_until >= ? AND (product LIKE ? OR active_substances LIKE ?)
+           GROUP BY product ORDER BY (product LIKE ?) DESC, product LIMIT ?""",
+        (iso, f"%{q}%", f"%{q}%", f"{q}%", limit)).fetchall()
+    return [{"product": r["product"], "function": r["function"],
+             "active_substances": [a["name"] for a in json.loads(r["subs"])], "usable_until": r["until"]}
+            for r in rows]
+
+
+def product_info(con, names: list[str]) -> list[dict]:
+    """Function, active substances and usability for the given product names (missing ones flagged)."""
+    out = []
+    for n in names:
+        r = con.execute(
+            """SELECT MIN(function) AS function, MIN(active_substances) AS subs, MAX(usable_until) AS until
+               FROM decisions WHERE product=?""", (n,)).fetchone()
+        if r is None or r["subs"] is None:
+            out.append({"product": n, "function": "", "active_substances": [], "usable_until": None, "known": False})
+        else:
+            out.append({"product": n, "function": r["function"], "known": True, "usable_until": r["until"],
+                        "active_substances": [a["name"] for a in json.loads(r["subs"])]})
+    return out
+
+
 def _pick_buffer(rows, codes: set[str]):
     """Choose the buffer row that applies to the crop; fall back to the strictest one."""
     if not rows:
@@ -157,7 +185,9 @@ def _merge_by_product(decisions: list[dict], order: dict) -> list[dict]:
     return list(merged.values())
 
 
-def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | None = None) -> dict:
+def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | None = None,
+             owned: set[str] | None = None) -> dict:
+    """`owned`: product names the user has in stock; these are marked and listed first."""
     today = today or date.today()
     iso = today.isoformat()
     row = con.execute("SELECT codes FROM crops WHERE name=?", (crop,)).fetchone()
@@ -240,12 +270,16 @@ def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | Non
 
     order = {"ok": 0, "warn": 1, "block": 2}
     products = _merge_by_product(products, order)
-    products.sort(key=lambda p: (order[p["level"]], p["product"].lower()))
+    owned = owned or set()
+    for p in products:
+        p["owned"] = p["product"] in owned
+    products.sort(key=lambda p: (not p["owned"], order[p["level"]], p["product"].lower()))
     return {
         "crop": crop,
         "nozzle": nozzle,
         "date": iso,
         "registry_date": registry_date(con),
         "counts": {k: sum(1 for p in products if p["level"] == k) for k in order},
+        "owned_counts": {k: sum(1 for p in products if p["level"] == k and p["owned"]) for k in order},
         "products": products,
     }
