@@ -4,6 +4,7 @@ Run:  uvicorn app.main:app --reload
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -172,7 +173,7 @@ def disconnect_my_fields(user: dict = Depends(current_user)):
 @app.get("/api/meta")
 def meta():
     app_info = {"app_name": config.APP_NAME, "app_tagline": config.APP_TAGLINE,
-                "support_email": config.SUPPORT_EMAIL, "support_ready": bool(config.SUPPORT_WEB3FORMS_KEY)}
+                "support_email": config.support_email(), "support_ready": bool(config.support_key())}
     try:
         con = registry()
     except HTTPException:
@@ -305,7 +306,7 @@ def _email_payload(m: dict, user: dict) -> dict:
     """What the browser sends to Web3Forms: the e-mail subject, reply-to address and readable fields."""
     who = user.get("name") or user["email"]
     payload = {
-        "access_key": config.SUPPORT_WEB3FORMS_KEY,
+        "access_key": config.support_key(),
         "subject": f"[{config.APP_NAME}] {m['kind_label']}: {m['subject']}",
         "from_name": f"{config.APP_NAME}: {who}",
         "Typ": m["kind_label"],
@@ -322,6 +323,27 @@ def _email_payload(m: dict, user: dict) -> dict:
     return payload
 
 
+class SupportSetup(BaseModel):
+    key: str
+    email: str = ""
+
+
+@app.post("/api/support/setup")
+def support_setup(body: SupportSetup, user: dict = Depends(current_user)):
+    """One-time setup from the Podpora page: saves the Web3Forms key to data/nastaveni.json (not in git).
+    Only allowed while no key is set, so nobody can quietly redirect the messages later."""
+    if config.support_key():
+        raise HTTPException(400, "Odesílání už je nastavené. Změnit ho jde v souboru data/nastaveni.json.")
+    key = body.key.strip()
+    if not re.fullmatch(r"[0-9a-fA-F-]{20,64}", key):
+        raise HTTPException(400, "Tohle nevypadá jako klíč z Web3Forms. Zkopírujte ho celý z e-mailu.")
+    email = body.email.strip()
+    if email and not users.EMAIL_RE.match(email):
+        raise HTTPException(400, "Zkontrolujte e-mail.")
+    config.save(web3forms_klic=key, **({"email_podpory": email} if email else {}))
+    return {"support_ready": True, "support_email": config.support_email()}
+
+
 @app.get("/api/support")
 def list_support(user: dict = Depends(current_user)):
     return support.list(user["id"])
@@ -333,7 +355,7 @@ def add_support(body: dict, user: dict = Depends(current_user)):
         m = support.add(user["id"], body)
     except sup.SupportError as e:
         raise HTTPException(400, str(e))
-    return {"message": m, "send": _email_payload(m, user) if config.SUPPORT_WEB3FORMS_KEY else None}
+    return {"message": m, "send": _email_payload(m, user) if config.support_key() else None}
 
 
 @app.get("/api/support/{msg_id}/payload")
@@ -342,7 +364,7 @@ def support_payload(msg_id: int, user: dict = Depends(current_user)):
         m = support.get(msg_id, user["id"])
     except KeyError:
         raise HTTPException(404, "Zpráva nenalezena.")
-    if not config.SUPPORT_WEB3FORMS_KEY:
+    if not config.support_key():
         raise HTTPException(400, "Odesílání e-mailem zatím není nastavené.")
     return _email_payload(m, user)
 

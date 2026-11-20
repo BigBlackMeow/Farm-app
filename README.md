@@ -90,8 +90,5 @@ Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python 
 
 ## Nastavení: název aplikace a e-mail pro podporu
 
-Obojí je v souboru `app/config.py`:
-
-- `APP_NAME`: název aplikace. Po změně se nový název ukáže v hlavičce, na přihlašovací stránce, v záložce prohlížeče i na tiskové sestavě.
-- `SUPPORT_WEB3FORMS_KEY`: klíč ze služby Web3Forms. Získáte ho zdarma na [web3forms.com](https://web3forms.com): zadáte e-mail, kam mají zprávy chodit, a klíč vám přijde e-mailem. Není to heslo, klíč jen umožní formuláři doručit zprávu na ten jeden e-mail. Dokud klíč není vyplněný, zprávy se jen ukládají v aplikaci.
-- `SUPPORT_EMAIL`: (nepovinné) e-mail, který aplikace ukáže, když se zprávu nepodaří odeslat.
+- **Název aplikace** je v souboru `app/config.py` (`APP_NAME`). Po změně se nový název ukáže v hlavičce, na přihlašovací stránce, v záložce prohlížeče i na tiskové sestavě.
+- **Odesílání zpráv z Podpory na e-mail** se nastaví přímo v aplikaci: na stránce Podpora je karta „Nastavit odesílání na e-mail“. Na [web3forms.com](https://web3forms.com) zadáte e-mail, kam mají zprávy chodit, klíč z e-mailu vložíte do aplikace a uložíte. Klíč se uloží do `data/nastaveni.json`, tedy jen u vás na počítači (není v gitu ani na GitHubu) a při aktualizaci se přenese se složkou `data`. Dokud klíč není nastavený, zprávy se jen ukládají v aplikaci.

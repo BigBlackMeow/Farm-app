@@ -438,9 +438,23 @@
         <div id="sfErr" class="error"></div>
         <div id="sfDone" hidden></div>
       </form>
+      <div>
+      <div class="card" id="sfSetup" style="margin-bottom:16px" hidden>
+        <h3 style="margin-top:0">Nastavit odesílání na e-mail</h3>
+        <p class="muted" style="margin:0">Jednorázové nastavení. Dokud není hotové, zprávy se jen ukládají v aplikaci.</p>
+        <ol class="muted" style="padding-left:20px;margin:10px 0 0">
+          <li>Otevřete <a href="https://web3forms.com" target="_blank" rel="noopener">web3forms.com</a>, zadejte e-mail, kam mají zprávy chodit, a klikněte na „Create Access Key“.</li>
+          <li>Klíč, který vám přijde e-mailem, vložte sem.</li>
+        </ol>
+        <label for="sfKey">Klíč (Access Key)</label><input id="sfKey" autocomplete="off" placeholder="např. 1a2b3c4d-…">
+        <label for="sfMail">E-mail podpory (nepovinné)</label><input id="sfMail" type="email" placeholder="ukáže se, když odeslání selže">
+        <button class="btn block" id="sfSave" type="button" style="margin-top:14px">Uložit nastavení</button>
+        <div id="sfSetupErr" class="error"></div>
+      </div>
       <div class="card">
         <h3 style="margin-top:0">Moje zprávy</h3>
         <div id="sfList"><p class="muted">Zatím jste nic neposlali.</p></div>
+      </div>
       </div>
     </div>
   </main>
@@ -1166,10 +1180,21 @@ async function showSupport() {
   $("#navSupport").classList.add("active"); $("#support").hidden = false;
   if (!$("#sf_contact").value && me) $("#sf_contact").value = me.email;
   $("#sfErr").textContent = "";
+  $("#sfSetup").hidden = !!appMeta.support_ready;
   setKind(sfKind); updateBar(); window.scrollTo(0, 0);
   loadSupport();
 }
 $("#navSupport").onclick = showSupport;
+$("#sfSave").onclick = async () => {
+  $("#sfSetupErr").textContent = "";
+  try {
+    const r = await api("/api/support/setup", { method: "POST", body: JSON.stringify({ key: $("#sfKey").value, email: $("#sfMail").value }) });
+    Object.assign(appMeta, r); $("#sfSetup").hidden = true; $("#sfKey").value = "";
+    $("#sfDone").hidden = false;
+    $("#sfDone").innerHTML = '<div class="notice ok"><b>Hotovo, zprávy teď budou chodit na e-mail.</b> Zkuste poslat první zkušební zprávu.</div>';
+    renderSupportList();
+  } catch (err) { $("#sfSetupErr").textContent = err.message; }
+};
 $("#sf").onsubmit = e => { e.preventDefault(); sendSupport(); };
 $("#sf_message").oninput = () => { $("#sfDone").hidden = true; };
 
