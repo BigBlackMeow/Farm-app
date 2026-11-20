@@ -42,7 +42,7 @@ Repozitář obsahuje `render.yaml`, takže aplikaci jde nasadit zdarma na [Rende
 
 1. Na render.com se zaregistrujte přes účet GitHub.
 2. Klikněte na **New → Blueprint**, vyberte repozitář `Farm-app` a potvrďte.
-3. Render se zeptá na `APP_PASSWORD`. To je heslo, které prohlížeč chce při otevření stránky (jméno může být libovolné). Když pole necháte prázdné, stránka bude bez hesla.
+3. Stránka je bez hesla. Kdo ho chce, přidá v Renderu v **Environment** proměnnou `APP_PASSWORD`; prohlížeč pak heslo vyžaduje (jméno může být libovolné).
 4. První sestavení trvá asi 6–8 minut, protože se stahuje registr přípravků. Pak je aplikace na adrese `https://farm-app-….onrender.com`.
 
 Bezplatná verze aplikaci po 15 minutách nečinnosti uspí. První otevření potom trvá asi minutu. Registr se obnoví při každém novém nasazení (v Renderu **Manual Deploy → Deploy latest commit**).

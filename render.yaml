@@ -12,5 +12,3 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.7
-      - key: APP_PASSWORD
-        sync: false   # Render asks for the value when the Blueprint is created
