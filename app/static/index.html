@@ -139,6 +139,7 @@
   .plist li:last-child { border-bottom:0; }
 
   /* bottom bar (summary + next) */
+  .banner { background:var(--block-bg); color:var(--block); border-bottom:1px solid #f1c7c2; padding:10px 20px; font-size:14px; font-weight:600; text-align:center; }
   .bottombar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); z-index:1000;
     box-shadow:0 -6px 24px rgba(20,40,20,.06); }
   .bottombar-in { max-width:1400px; margin:0 auto; padding:12px 20px; display:flex; align-items:center; gap:14px; }
@@ -185,6 +186,7 @@
       <span class="user" id="userName"></span>
       <button class="btn ghost small" id="logout">Odhlásit</button>
     </div>
+    <div class="banner" id="regBanner" hidden></div>
     <nav class="stepper" id="stepper">
       <button data-step="1" class="active"><span class="num">1</span><span><span class="lbl">Pozemek</span><span class="sub" id="sub1">vyberte v mapě</span></span></button>
       <button data-step="2" disabled><span class="num">2</span><span><span class="lbl">Plodina a technika</span><span class="sub" id="sub2">co a čím stříkáte</span></span></button>
@@ -442,7 +444,9 @@ function setCrop(name) {
 }
 async function loadTopCrops() {
   if ($("#cropChips").children.length) return;
-  const list = await api("/api/crops?q=");
+  let list;
+  try { list = await api("/api/crops?q="); }
+  catch (err) { $("#cropChips").innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
   $("#cropChips").innerHTML = list.slice(0, 14).map(c => `<button class="chip" data-name="${esc(c.name)}">${esc(c.name)}</button>`).join("");
   $$("#cropChips .chip").forEach(c => c.onclick = () => { $("#crop").value = c.dataset.name; setCrop(c.dataset.name); });
 }
@@ -542,7 +546,10 @@ function renderStock() {
   $$("#plist [data-rm]").forEach(b => b.onclick = async () => { await removeStock(b.dataset.rm); searchProducts(); });
   updateBar();
 }
-async function loadStock() { stock = await api("/api/my-products"); renderStock(); }
+async function loadStock() {
+  try { stock = await api("/api/my-products"); } catch (err) { stock = []; }
+  renderStock();
+}
 async function addStock(product) { stock = await api("/api/my-products", { method: "POST", body: JSON.stringify({ product }) }); renderStock(); }
 async function removeStock(product) { stock = await api("/api/my-products?" + new URLSearchParams({ product }), { method: "DELETE" }); renderStock(); }
 function showStock() {
@@ -555,7 +562,9 @@ let pTimer;
 async function searchProducts() {
   const q = $("#pq").value.trim();
   if (q.length < 2) { $("#psearch").innerHTML = '<li class="muted">Napište aspoň 2 písmena.</li>'; return; }
-  const list = await api("/api/products?q=" + encodeURIComponent(q));
+  let list;
+  try { list = await api("/api/products?q=" + encodeURIComponent(q)); }
+  catch (err) { $("#psearch").innerHTML = `<li class="error">${esc(err.message)}</li>`; return; }
   const have = new Set(stock.map(s => s.product));
   $("#psearch").innerHTML = list.map(p => `<li><span><b>${esc(p.product)}</b><br><span class="muted">${esc(p.function)} · ${p.active_substances.map(esc).join(", ")}</span></span>
     ${have.has(p.product) ? '<span class="flag own">na skladě</span>' : `<button class="btn small" data-add="${esc(p.product)}">Přidat</button>`}</li>`).join("")
@@ -563,9 +572,11 @@ async function searchProducts() {
   $$("#psearch [data-add]").forEach(b => b.onclick = async () => { await addStock(b.dataset.add); searchProducts(); });
 }
 $("#pq").addEventListener("input", () => { clearTimeout(pTimer); pTimer = setTimeout(searchProducts, 200); });
+$("#pq").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(pTimer); searchProducts(); } });
 
 /* ---------------- start ---------------- */
 fetch("/api/meta").then(r => r.json()).then(m => {
+  if (!m.registry_ready) { $("#regBanner").textContent = m.message; $("#regBanner").hidden = false; }
   if (m.registry_date) $("#regdate").textContent = "Registr přípravků ÚKZÚZ ke dni " + new Date(m.registry_date).toLocaleDateString("cs-CZ") + ".";
 });
 fetch("/api/me").then(r => r.ok ? r.json() : null).then(u => { if (u) { me = u; showApp(); } else showLogin(); });
