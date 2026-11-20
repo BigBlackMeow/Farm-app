@@ -26,15 +26,36 @@ Webová aplikace, která pro díl půdního bloku z LPIS a zvolenou plodinu vyp�
 | Vodní toky a vodní plochy | ČÚZK ZABAGED, ArcGIS REST `ags.cuzk.gov.cz/.../ZABAGED_POLOHOPIS/MapServer` (vrstvy 93 a 132) | veřejná |
 | Podkladová mapa | OpenStreetMap + WMS LPIS | veřejná |
 
-## Spuštění
+## Spuštění na vlastním počítači (Windows)
 
-```bash
-pip install -r requirements.txt
-python -m app.registry_import        # stáhne registr do data/registry.sqlite (asi 4 minuty, ~45 MB XML)
-uvicorn app.main:app --port 8000     # pak otevřete http://localhost:8000
-```
+Aplikace běží jen u vás na počítači a otevírá se v prohlížeči. Potřebuje připojení k internetu, protože data bere z veřejných služeb MZe a ČÚZK.
 
-Registr se mění zhruba jednou za měsíc. Import stačí spouštět jednou denně.
+**Jednou na začátku**
+
+1. Nainstalujte Python z [python.org/downloads](https://www.python.org/downloads/). V instalátoru zaškrtněte **Add python.exe to PATH**.
+2. Na GitHubu u repozitáře klikněte na zelené **Code → Download ZIP** a ZIP rozbalte, například do `C:\farm-app`.
+3. Otevřete rozbalenou složku v Průzkumníku, klikněte do řádku s cestou nahoře, napište `cmd` a stiskněte Enter. Otevře se příkazový řádek přímo v této složce.
+4. Do něj postupně zadejte:
+
+   ```
+   python -m pip install -r requirements.txt
+   python -m app.registry_import
+   ```
+
+   Druhý příkaz stáhne registr přípravků. Trvá asi 4 minuty.
+
+**Pokaždé, když chcete aplikaci použít**
+
+1. Otevřete příkazový řádek ve složce aplikace (krok 3 výše) a zadejte:
+
+   ```
+   python -m uvicorn app.main:app --port 8000
+   ```
+
+2. V prohlížeči otevřete http://localhost:8000.
+3. Aplikaci ukončíte zavřením okna příkazového řádku.
+
+Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python -m app.registry_import`.
 
 ## Známá omezení
 
