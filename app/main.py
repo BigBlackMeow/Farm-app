@@ -4,10 +4,13 @@ Run:  uvicorn app.main:app --reload
 """
 from __future__ import annotations
 
+import base64
+import os
+import secrets
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import evaluate as ev
@@ -18,6 +21,31 @@ STATIC = Path(__file__).resolve().parent / "static"
 app = FastAPI(title="Farm App – přípravky na pozemek")
 con = ev.connect()
 _fields: dict[str, dict] = {}  # field id -> {"field", "ctx"}; in-memory cache
+
+# Optional demo protection: when APP_PASSWORD is set, the browser asks for a
+# password (any user name works). /healthz stays open for the hosting health check.
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+
+
+@app.middleware("http")
+async def password_gate(request: Request, call_next):
+    if not APP_PASSWORD or request.url.path == "/healthz":
+        return await call_next(request)
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("basic "):
+        try:
+            _, _, pw = base64.b64decode(auth[6:]).decode("utf-8").partition(":")
+        except Exception:
+            pw = ""
+        if secrets.compare_digest(pw.encode(), APP_PASSWORD.encode()):
+            return await call_next(request)
+    return PlainTextResponse("Zadejte heslo.", status_code=401,
+                             headers={"WWW-Authenticate": 'Basic realm="Farm App", charset="UTF-8"'})
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
 
 
 @app.get("/")

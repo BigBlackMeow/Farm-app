@@ -36,6 +36,17 @@ uvicorn app.main:app --port 8000     # pak otevřete http://localhost:8000
 
 Registr se mění zhruba jednou za měsíc. Import stačí spouštět jednou denně.
 
+## Nasazení na internet (Render)
+
+Repozitář obsahuje `render.yaml`, takže aplikaci jde nasadit zdarma na [Render](https://render.com):
+
+1. Na render.com se zaregistrujte přes účet GitHub.
+2. Klikněte na **New → Blueprint**, vyberte repozitář `Farm-app` a potvrďte.
+3. Render se zeptá na `APP_PASSWORD`. To je heslo, které prohlížeč chce při otevření stránky (jméno může být libovolné). Když pole necháte prázdné, stránka bude bez hesla.
+4. První sestavení trvá asi 6–8 minut, protože se stahuje registr přípravků. Pak je aplikace na adrese `https://farm-app-….onrender.com`.
+
+Bezplatná verze aplikaci po 15 minutách nečinnosti uspí. První otevření potom trvá asi minutu. Registr se obnoví při každém novém nasazení (v Renderu **Manual Deploy → Deploy latest commit**).
+
 ## Známá omezení
 
 - **Vodní toky:** počítají se stálé i občasné toky a vodní plochy ze ZABAGED. Podzemní (zatrubněné) toky se nepočítají. Meliorační příkopy, které v ZABAGED nejsou, aplikace nevidí.

@@ -1,0 +1,16 @@
+# Render Blueprint: one free web service.
+# The build downloads the product registry (about 4 minutes) into data/registry.sqlite.
+services:
+  - type: web
+    name: farm-app
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt && python -m app.registry_import
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: APP_PASSWORD
+        sync: false   # Render asks for the value when the Blueprint is created
