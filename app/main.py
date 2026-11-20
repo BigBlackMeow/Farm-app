@@ -18,7 +18,20 @@ from . import users
 STATIC = Path(__file__).resolve().parent / "static"
 
 app = FastAPI(title="Farm App – přípravky na pozemek")
-con = ev.connect()
+_registry = {"con": None}
+NO_REGISTRY = ("Registr přípravků není stažený. Zastavte aplikaci (Ctrl+C), spusťte "
+               "python -m app.registry_import a pak aplikaci spusťte znovu.")
+
+
+def registry():
+    """Connection to the product registry; 503 with instructions if it has not been downloaded yet."""
+    if _registry["con"] is None:
+        _registry["con"] = ev.connect_if_ready()
+    if _registry["con"] is None:
+        raise HTTPException(503, NO_REGISTRY)
+    return _registry["con"]
+
+
 _fields: dict[str, dict] = {}  # field id -> {"field", "ctx"}; in-memory cache
 store = users.Store()
 COOKIE = "farm_session"
@@ -86,17 +99,17 @@ class ProductName(BaseModel):
 
 
 @app.get("/api/products")
-def products(q: str = "", user: dict = Depends(current_user)):
+def products(q: str = "", user: dict = Depends(current_user), con=Depends(registry)):
     return ev.search_products(con, q.strip())
 
 
 @app.get("/api/my-products")
-def my_products(user: dict = Depends(current_user)):
+def my_products(user: dict = Depends(current_user), con=Depends(registry)):
     return ev.product_info(con, store.products(user["id"]))
 
 
 @app.post("/api/my-products")
-def add_my_product(body: ProductName, user: dict = Depends(current_user)):
+def add_my_product(body: ProductName, user: dict = Depends(current_user), con=Depends(registry)):
     if not ev.product_info(con, [body.product])[0]["known"]:
         raise HTTPException(400, "Přípravek v registru není.")
     store.add_product(user["id"], body.product)
@@ -104,7 +117,7 @@ def add_my_product(body: ProductName, user: dict = Depends(current_user)):
 
 
 @app.delete("/api/my-products")
-def remove_my_product(product: str, user: dict = Depends(current_user)):
+def remove_my_product(product: str, user: dict = Depends(current_user), con=Depends(registry)):
     store.remove_product(user["id"], product)
     return ev.product_info(con, store.products(user["id"]))
 
@@ -112,11 +125,15 @@ def remove_my_product(product: str, user: dict = Depends(current_user)):
 # --- fields and evaluation ----------------------------------------------------------------------
 @app.get("/api/meta")
 def meta():
-    return {"registry_date": ev.registry_date(con)}
+    try:
+        con = registry()
+    except HTTPException:
+        return {"registry_date": "", "registry_ready": False, "message": NO_REGISTRY}
+    return {"registry_date": ev.registry_date(con), "registry_ready": True}
 
 
 @app.get("/api/crops")
-def crops(q: str = "", user: dict = Depends(current_user)):
+def crops(q: str = "", user: dict = Depends(current_user), con=Depends(registry)):
     return ev.list_crops(con, q)
 
 
@@ -140,7 +157,8 @@ def field(square: str | None = None, code: str | None = None,
 
 
 @app.get("/api/evaluate")
-def evaluate(field_id: str, crop: str, nozzle: int = 0, user: dict = Depends(current_user)):
+def evaluate(field_id: str, crop: str, nozzle: int = 0, user: dict = Depends(current_user),
+             con=Depends(registry)):
     if nozzle not in (0, 50, 75, 90):
         raise HTTPException(400, "Redukce úletu musí být 0, 50, 75 nebo 90 %.")
     entry = _fields.get(field_id)

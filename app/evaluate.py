@@ -26,6 +26,20 @@ def connect(db_path: Path = DB_PATH) -> sqlite3.Connection:
     return con
 
 
+def connect_if_ready(db_path: Path = DB_PATH) -> sqlite3.Connection | None:
+    """Open the registry read-only; None if it has not been downloaded (python -m app.registry_import)."""
+    if not db_path.exists():
+        return None
+    con = sqlite3.connect(db_path.resolve().as_uri() + "?mode=ro", uri=True, check_same_thread=False)
+    con.row_factory = sqlite3.Row
+    try:
+        con.execute("SELECT 1 FROM decisions LIMIT 1")
+    except sqlite3.Error:
+        con.close()
+        return None
+    return con
+
+
 def registry_date(con) -> str:
     row = con.execute("SELECT value FROM meta WHERE key='registry_last_change'").fetchone()
     return row[0] if row else ""
