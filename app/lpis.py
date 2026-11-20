@@ -109,6 +109,7 @@ def _field_from_feature(f: dict) -> dict:
         "erosion": (p.get("EROZE3G") or "").strip(),
         "farming_regime": (p.get("rezimEZ_PO") or "").strip(),
         "user": (p.get("uzivatel") or "").strip(),
+        "ji": (p.get("JIuzivatele") or "").strip(),
         "region": (p.get("uzemniPrislusnost") or "").strip(),
         "geometry": f["geometry"].buffer(0),
     }
@@ -123,6 +124,18 @@ def field_by_code(square: str, short_code: str) -> dict:
     if not feats:
         raise FieldNotFound(code)
     return _field_from_feature(feats[0])
+
+
+def fields_by_ji(ji: str) -> list[dict]:
+    """All effective DPBs farmed by one user, found by the user's public LPIS identifier (ID JI)."""
+    flt = ("<Filter><PropertyIsEqualTo><PropertyName>JIuzivatele</PropertyName>"
+           f"<Literal>{_xml_escape(ji)}</Literal></PropertyIsEqualTo></Filter>")
+    return [_field_from_feature(f) for f in _get_features("LPIS_DPB_UCINNE", filter_xml=flt, max_features=5000)]
+
+
+def field_outline(field: dict) -> dict:
+    """Light-weight WGS84 outline of a field for drawing on the map (simplified to about 1 m)."""
+    return _to_geojson(field["geometry"].simplify(1.0, preserve_topology=True))
 
 
 def field_at(lat: float, lon: float) -> dict:

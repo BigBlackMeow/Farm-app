@@ -94,6 +94,24 @@
     animation:spin .8s linear infinite; vertical-align:-2px; margin-right:6px; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
+  /* my fields */
+  .flist { list-style:none; padding:0; margin:10px 0 0; max-height:min(46vh, 420px); overflow-y:auto; border-top:1px solid var(--line); }
+  .flist li { display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); }
+  .flist li.active { background:var(--accent-soft); }
+  .flist .fl-main { flex:1; min-width:0; text-align:left; border:0; background:transparent; font:inherit; padding:9px 6px; cursor:pointer; color:var(--text); }
+  .flist .fl-main b { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .flist .fl-main .muted { display:block; font-size:12px; }
+  .flist .rn { flex:1; display:flex; gap:6px; padding:6px 0; } .flist .rn input { padding:7px 10px; }
+  .flist .gone { color:var(--warn); }
+  .check { display:flex; align-items:center; gap:8px; color:var(--text); font-size:14px; margin:10px 0 0; cursor:pointer; }
+  .check input { width:auto; margin:0; }
+  .my-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .my-head h3 { margin:0; }
+  .flabel { background:rgba(255,255,255,.88); border:0; box-shadow:0 1px 3px rgba(0,0,0,.25); color:#18241a; font-weight:600; font-size:12px; padding:1px 6px; border-radius:6px; white-space:nowrap; }
+  .flabel::before { display:none; }
+  .flabel.sel { background:#214d29; color:#fff; }
+  .map-far .flabel { display:none; }
+
   /* step 2: options as cards */
   .two-col { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
   @media (max-width: 860px) { .two-col { grid-template-columns:1fr; } }
@@ -221,7 +239,30 @@
     <div class="field-grid">
       <div id="map"></div>
       <div>
-        <div class="card">
+        <div class="card" style="margin-bottom:16px" id="fieldCard" hidden>
+          <h3>Vybraný pozemek</h3>
+          <div id="fieldInfo"></div>
+        </div>
+        <div class="card" id="myCard">
+          <div id="myEmpty">
+            <h3>Moje pole</h3>
+            <p class="muted" style="margin:0">Zadejte své ID JI z LPIS a aplikace načte všechna vaše pole. Pak je uvidíte v mapě a můžete si je pojmenovat. Nikam se přihlašovat nemusíte, tyto údaje jsou v LPIS veřejné.</p>
+            <label for="jiInput">ID JI (číslo uživatele v LPIS)</label>
+            <input id="jiInput" inputmode="numeric" placeholder="např. 1000123456" autocomplete="off">
+            <button class="btn block" id="jiLoad" style="margin-top:12px">Načíst moje pole</button>
+            <div class="hint">Číslo najdete v Portálu farmáře nebo na výpisu z LPIS. Jednodušší je kliknout v mapě na kterékoli své pole a zvolit „Tohle je moje pole“.</div>
+            <div id="jiErr" class="error"></div>
+          </div>
+          <div id="myHave" hidden>
+            <div class="my-head"><h3>Moje pole <span class="muted" id="myCount"></span></h3><button class="btn ghost small" id="mySetBtn">Nastavení</button></div>
+            <div class="muted" id="myFarmer"></div>
+            <div id="mySettings" class="map-hint" hidden></div>
+            <input id="myFilter" placeholder="Hledat pole podle názvu nebo kódu" autocomplete="off" style="margin-top:10px">
+            <label class="check"><input type="checkbox" id="myOnly" checked> V mapě ukázat jen moje pole</label>
+            <ul class="flist" id="myList"></ul>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
           <h3>Najít podle kódu</h3>
           <div class="row">
             <div><label for="square">Čtverec</label><input id="square" placeholder="550-1150"></div>
@@ -229,10 +270,6 @@
           </div>
           <button class="btn block" id="loadField" style="margin-top:14px">Načíst z LPIS</button>
           <div class="map-hint" id="mapHint">Tip: od přiblížení na úroveň obce se v mapě ukážou hranice dílů. Pak stačí kliknout.</div>
-        </div>
-        <div class="card" style="margin-top:16px" id="fieldCard" hidden>
-          <h3>Vybraný pozemek</h3>
-          <div id="fieldInfo"></div>
         </div>
       </div>
     </div>
@@ -419,12 +456,14 @@ async function showApp() {
   $("#login").hidden = true; $("#app").hidden = false;
   $("#userName").textContent = me.name || me.email;
   initMap();
+  loadMyFields();
   loadStock();
   loadTopCrops();
   goStep(step);
 }
 
 /* ---------------- wizard state ---------------- */
+function fieldTitle() { const m = myField(field); return m && m.name ? `${m.name} (díl ${field.short_code})` : `Díl ${field.short_code}`; }
 let step = 1, fieldId = null, field = null, crop = "", nozzle = 0, lastResult = null, stock = [], view = "wizard";
 
 function goStep(n) {
@@ -450,7 +489,7 @@ $("#editStock").onclick = showStock;
 
 function updateBar() {
   const parts = [];
-  if (field) parts.push(`<b>Díl ${esc(field.short_code)}</b> · ${num(field.area_ha)} ha`);
+  if (field) parts.push(`<b>${esc(fieldTitle())}</b> · ${num(field.area_ha)} ha`);
   if (crop) parts.push(`<b>${esc(crop)}</b>`);
   if (fieldId) parts.push(nozzle ? `trysky ${nozzle} %` : "bez redukce úletu");
   if (view === "records" || view === "form") {
@@ -469,7 +508,7 @@ function updateBar() {
   if (step === 1) { next.textContent = "Pokračovat: plodina"; next.disabled = !fieldId; }
   if (step === 2) { next.textContent = "Vyhodnotit přípravky"; next.disabled = !(fieldId && crop); }
   if (step === 3) { next.textContent = "Nový pozemek"; next.disabled = false; }
-  $("#sub1").textContent = field ? `díl ${field.short_code}` : "vyberte v mapě";
+  $("#sub1").textContent = field ? fieldTitle() : "vyberte v mapě";
   $("#sub2").textContent = crop || "co a čím stříkáte";
   $("#sub3").textContent = lastResult ? `${lastResult.counts.ok + lastResult.counts.warn} použitelných` : "povolené přípravky";
 }
@@ -489,16 +528,153 @@ function initMap() {
   if (map) return;
   map = L.map("map").setView([49.8, 15.5], 7);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
-  L.tileLayer.wms("https://mze.gov.cz/public/app/wms/public_DPB_PB_OPV.fcgi", {
+  lpisWms = L.tileLayer.wms("https://mze.gov.cz/public/app/wms/public_DPB_PB_OPV.fcgi", {
     layers: "DPB_UCINNE", format: "image/png", transparent: true, minZoom: 13, attribution: "LPIS © MZe"
   }).addTo(map);
   map.on("click", e => {
+    if (onlyMine()) return;  // only my fields are shown: they handle their own clicks
     if (map.getZoom() >= 13) loadField({ lat: e.latlng.lat, lon: e.latlng.lng });
     else { map.setView(e.latlng, Math.min(map.getZoom() + 3, 14)); }
   });
-  map.on("zoomend", () => {
-    $("#mapHint").textContent = map.getZoom() >= 13 ? "Klikněte na díl v mapě." : "Tip: přibližte mapu. Od úrovně obce se ukážou hranice dílů a stačí kliknout.";
+  map.on("zoomend", updateMapHint);
+  updateMapHint();
+}
+function updateMapHint() {
+  if (!map) return;
+  map.getContainer().classList.toggle("map-far", map.getZoom() < 13);
+  $("#mapHint").textContent = onlyMine() ? "V mapě jsou jen vaše pole. Klikněte na pole, nebo ho vyberte v seznamu."
+    : map.getZoom() >= 13 ? "Klikněte na díl v mapě." : "Tip: přibližte mapu. Od úrovně obce se ukážou hranice dílů a stačí kliknout.";
+}
+
+/* ---------------- my fields ---------------- */
+let myF = { ji: "", farmer: "", fields: [] }, myLayer = null, lpisWms = null, myFilter = "", renaming = null;
+let myOnlyPref = (() => { try { return localStorage.getItem("myOnly") !== "0"; } catch { return true; } })();
+$("#myOnly").checked = myOnlyPref;
+const fkey = f => f.square + "|" + f.short_code;
+const fLabel = f => f.name || `díl ${f.short_code}`;
+const onlyMine = () => myOnlyPref && myF.fields.length > 0;
+const myField = f => f && myF.fields.find(x => x.square === f.square && x.short_code === f.short_code);
+const myMatches = f => { const q = myFilter.trim().toLowerCase();
+  return !q || `${f.name} ${f.short_code} ${f.square} ${f.code} ${f.land_use}`.toLowerCase().includes(q); };
+
+async function loadMyFields() {
+  try { myF = await api("/api/my-fields"); } catch { return; }
+  renderMyFields();
+  if (!fieldId) fitMyFields();
+}
+function setMyData(d) { myF = d; renderMyFields(); fitMyFields(); if (field) showFieldInfo(); }
+async function connectJI(ji, errBox) {
+  const btn = $("#jiLoad"); btn.disabled = true;
+  if (errBox) errBox.innerHTML = '<span class="muted"><span class="spinner"></span>Načítám vaše pole z LPIS…</span>';
+  try { setMyData(await api("/api/my-fields/load", { method: "POST", body: JSON.stringify({ ji }) })); if (errBox) errBox.textContent = ""; }
+  catch (err) { if (errBox) errBox.textContent = err.message; }
+  btn.disabled = false;
+}
+$("#jiLoad").onclick = () => connectJI($("#jiInput").value, $("#jiErr"));
+$("#jiInput").addEventListener("keydown", e => { if (e.key === "Enter") $("#jiLoad").click(); });
+$("#myOnly").onchange = () => {
+  myOnlyPref = $("#myOnly").checked;
+  try { localStorage.setItem("myOnly", myOnlyPref ? "1" : "0"); } catch {}
+  applyOnlyMine();
+};
+let myFilterTimer;
+$("#myFilter").addEventListener("input", () => {
+  myFilter = $("#myFilter").value; renderMyList();
+  clearTimeout(myFilterTimer); myFilterTimer = setTimeout(() => { drawMyFields(); if (myFilter.trim()) fitMyFields(); }, 250);
+});
+$("#myFilter").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const hits = myF.fields.filter(f => myMatches(f) && f.in_lpis);
+  if (hits.length === 1) selectMyField(hits[0]);
+});
+$("#mySetBtn").onclick = () => {
+  const box = $("#mySettings");
+  box.hidden = !box.hidden;
+  box.innerHTML = `ID JI <b>${esc(myF.ji)}</b>${myF.loaded_at ? `, načteno ${new Date(myF.loaded_at).toLocaleDateString("cs-CZ")}` : ""}.
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn small" id="myReload">Znovu načíst z LPIS</button>
+      <button class="btn ghost small" id="myDisc">Odpojit</button></div>
+    <div class="hint">Znovu načtěte, když v LPIS přibude nebo se změní díl. Vaše názvy zůstanou.</div><div class="error" id="myErr"></div>`;
+  $("#myReload").onclick = () => connectJI(myF.ji, $("#myErr"));
+  $("#myDisc").onclick = async () => {
+    if ($("#myDisc").dataset.sure !== "1") { $("#myDisc").dataset.sure = "1"; $("#myDisc").textContent = "Opravdu odpojit? Smaže i názvy polí"; return; }
+    setMyData(await api("/api/my-fields", { method: "DELETE" }));
+  };
+};
+
+function renderMyFields() {
+  const has = myF.fields.length > 0;
+  $("#myEmpty").hidden = has; $("#myHave").hidden = !has;
+  if (!has) { $("#jiInput").value = myF.ji || ""; }
+  else {
+    const ha = myF.fields.filter(f => f.in_lpis).reduce((a, f) => a + (f.area_ha || 0), 0);
+    $("#myCount").textContent = `(${myF.fields.length}, ${num(Math.round(ha * 100) / 100)} ha)`;
+    $("#myFarmer").textContent = myF.farmer ? `Uživatel v LPIS: ${myF.farmer}` : "";
+    $("#mySettings").hidden = true;
+  }
+  renderMyList(); drawMyFields(); applyOnlyMine();
+}
+function renderMyList() {
+  const sel = myField(field), list = myF.fields.filter(myMatches);
+  $("#myList").innerHTML = list.map(f => {
+    const k = fkey(f);
+    if (renaming === k) return `<li data-k="${esc(k)}"><div class="rn"><input id="rnInput" value="${esc(f.name)}" placeholder="např. Za humny" maxlength="60">
+      <button class="btn small" data-save>Uložit</button><button class="btn ghost small" data-cancel>Zrušit</button></div></li>`;
+    return `<li data-k="${esc(k)}" class="${sel && fkey(sel) === k ? "active" : ""}">
+      <button class="fl-main" ${f.in_lpis ? "" : "disabled"}><b>${f.name ? esc(f.name) : `<span class="muted" style="display:inline;font-size:inherit">bez názvu</span>`}</b>
+      <span class="muted">díl ${esc(f.short_code)} · ${esc(f.square)} · ${f.area_ha != null ? num(f.area_ha) + " ha" : ""}${f.land_use ? " · " + esc(f.land_use) : ""}
+      ${f.in_lpis ? "" : ' · <span class="gone">už není v LPIS</span>'}</span></button>
+      <button class="btn ghost small" data-rename>${f.name ? "Přejmenovat" : "Pojmenovat"}</button></li>`;
+  }).join("") || '<li class="muted" style="padding:10px 0">Žádné pole tomu neodpovídá.</li>';
+  $$("#myList li[data-k]").forEach(li => {
+    const f = myF.fields.find(x => fkey(x) === li.dataset.k);
+    const main = li.querySelector(".fl-main"); if (main) main.onclick = () => selectMyField(f);
+    const rb = li.querySelector("[data-rename]"); if (rb) rb.onclick = () => { renaming = li.dataset.k; renderMyList(); const i = $("#rnInput"); i.focus(); i.select(); };
+    const save = async () => {
+      try { myF = await api("/api/my-fields/name", { method: "PUT", body: JSON.stringify({ square: f.square, short_code: f.short_code, name: $("#rnInput").value }) }); }
+      catch (err) { alertBox(err.message); }
+      renaming = null; renderMyList(); drawMyFields(); updateBar(); if (field) showFieldInfo();
+    };
+    const sv = li.querySelector("[data-save]"); if (sv) sv.onclick = save;
+    const cn = li.querySelector("[data-cancel]"); if (cn) cn.onclick = () => { renaming = null; renderMyList(); };
+    const inp = li.querySelector("#rnInput");
+    if (inp) inp.onkeydown = e => { if (e.key === "Enter") save(); if (e.key === "Escape") { renaming = null; renderMyList(); } };
   });
+}
+function alertBox(msg) { const e = $("#mySettings"); e.hidden = false; e.innerHTML = `<span class="error">${esc(msg)}</span>`; }
+
+function drawMyFields() {
+  if (!map) return;
+  if (myLayer) { map.removeLayer(myLayer); myLayer = null; }
+  const sel = myField(field);
+  const feats = myF.fields.filter(f => f.geometry && myMatches(f))
+    .map(f => ({ type: "Feature", geometry: f.geometry, properties: { k: fkey(f) } }));
+  if (!feats.length) return;
+  myLayer = L.geoJSON({ type: "FeatureCollection", features: feats }, {
+    style: ft => sel && ft.properties.k === fkey(sel)
+      ? { color: "#214d29", weight: 4, fillColor: "#2f6b3a", fillOpacity: .35 }
+      : { color: "#c9a227", weight: 2, fillColor: "#e9c94a", fillOpacity: .28 },
+    onEachFeature: (ft, layer) => {
+      const f = myF.fields.find(x => fkey(x) === ft.properties.k);
+      const isSel = sel && fkey(sel) === ft.properties.k;
+      layer.bindTooltip(esc(fLabel(f)), { permanent: true, direction: "center", className: "flabel" + (isSel ? " sel" : "") });
+      layer.on("click", e => { L.DomEvent.stopPropagation(e); selectMyField(f); });
+    }
+  }).addTo(map);  [slopeLayer, waterLayer, fieldLayer].forEach(l => l && l.bringToFront());
+}
+function fitMyFields() {
+  if (!map || !myLayer) return;
+  const b = myLayer.getBounds(); if (b.isValid()) map.fitBounds(b, { maxZoom: 16, padding: [20, 20] });
+}
+function applyOnlyMine() {
+  if (!map || !lpisWms) return;
+  if (onlyMine()) { if (map.hasLayer(lpisWms)) map.removeLayer(lpisWms); }
+  else if (!map.hasLayer(lpisWms)) lpisWms.addTo(map);
+  updateMapHint();
+}
+function selectMyField(f) {
+  if (!f || !f.in_lpis) return;
+  loadField({ square: f.square, code: f.short_code });
 }
 
 async function loadField(params) {
@@ -508,7 +684,7 @@ async function loadField(params) {
   try { data = await api("/api/field?" + new URLSearchParams(params)); }
   catch (err) { $("#fieldInfo").innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
   const f = data.field, c = data.context;
-  field = f; fieldId = String(f.id); lastResult = null;
+  field = f; fieldId = String(f.id); fieldCtx = c; lastResult = null;
   $("#square").value = f.square; $("#code").value = f.short_code;
   [fieldLayer, slopeLayer, waterLayer].forEach(l => l && map.removeLayer(l));
   slopeLayer = waterLayer = null;
@@ -516,10 +692,20 @@ async function loadField(params) {
   if (c.slope_near_water.geometry) slopeLayer = L.geoJSON(c.slope_near_water.geometry, { style: { color: "#a15c00", weight: 1, fillOpacity: .4 } }).addTo(map);
   if (c.water && c.water.geometry) waterLayer = L.geoJSON(c.water.geometry, { style: { color: "#1565c0", weight: 3, fillColor: "#1565c0", fillOpacity: .35 } }).addTo(map);
   map.fitBounds(fieldLayer.getBounds(), { maxZoom: 16 });
+  renderMyList(); drawMyFields();
+  showFieldInfo();
+  goStep(1);
+}
+let fieldCtx = null;
+function showFieldInfo() {
+  const f = field, c = fieldCtx, mine = myField(f);
   const w = c.water || {};
   const waterText = w.found ? `${num(w.min_distance_m)} m (${esc(w.nearest.name)})` : "do 60 m žádná";
   const er = c.erosion;
+  const own = mine ? `<dt>Název</dt><dd><b>${esc(mine.name || "bez názvu")}</b></dd>`
+    : f.user ? `<dt>Uživatel</dt><dd>${esc(f.user)}</dd>` : "";
   $("#fieldInfo").innerHTML = `<dl class="facts">
+    ${own}
     <dt>Díl</dt><dd><b>${esc(f.code)}</b></dd>
     <dt>Výměra</dt><dd>${num(f.area_ha)} ha, ${esc(f.land_use)}</dd>
     <dt>Eroze</dt><dd>${esc(f.erosion || "–")}${er ? ` (SEO ${er.seo_ha} ha, MEO ${er.meo_ha} ha)` : ""}</dd>
@@ -527,8 +713,10 @@ async function loadField(params) {
     <dt>Svah u vody</dt><dd>${c.slope_near_water.intersects ? `<span class="flag warn">ano, ${c.slope_near_water.area_ha} ha</span>` : "ne"}</dd>
     <dt>OPVZ I. st.</dt><dd>${c.opvz1_buffer.intersects ? '<span class="flag warn">v okolí 100 m</span>' : "ne"}</dd>
     <dt>Včelstva</dt><dd>${c.apiaries.count} stanovišť do ${c.apiaries.radius_m / 1000} km</dd>
-  </dl>`;
-  goStep(1);
+  </dl>
+  ${!myF.fields.length && f.ji ? `<button class="btn ghost small" id="itsMine" style="margin-top:12px">Tohle je moje pole: načíst všechna moje pole</button>
+    <div class="hint">Načte všechny díly uživatele ${esc(f.user)} (ID JI ${esc(f.ji)}).</div><div class="error" id="itsMineErr"></div>` : ""}`;
+  const im = $("#itsMine"); if (im) im.onclick = () => { im.disabled = true; connectJI(f.ji, $("#itsMineErr")); };
 }
 $("#loadField").onclick = () => {
   const square = $("#square").value.trim(), code = $("#code").value.trim();
@@ -584,7 +772,7 @@ let resultTab = "all", resultFilter = "";
 function renderResults() {
   const d = lastResult, q = resultFilter.toLowerCase();
   const nOwn = d.products.filter(p => p.owned).length;
-  $("#resultHead").textContent = `Díl ${field.short_code} · ${d.crop} · ${d.nozzle ? "trysky " + d.nozzle + " %" : "bez redukce úletu"}`;
+  $("#resultHead").textContent = `${fieldTitle()} · ${d.crop} · ${d.nozzle ? "trysky " + d.nozzle + " %" : "bez redukce úletu"}`;
   const items = d.products.filter(p => (resultTab === "all" || p.owned) &&
     (!q || (p.product + " " + p.uses.map(u => u.target).join(" ") + " " + p.active_substances.map(a => a.name).join(" ")).toLowerCase().includes(q)));
   const counts = resultTab === "own" ? d.owned_counts : d.counts;

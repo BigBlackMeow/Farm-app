@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from . import evaluate as ev
 from . import lpis
+from . import myfields as mf
 from . import records as rec
 from . import users
 
@@ -36,6 +37,7 @@ def registry():
 _fields: dict[str, dict] = {}  # field id -> {"field", "ctx"}; in-memory cache
 store = users.Store()
 records = rec.Records(store)
+my_fields = mf.MyFields(store)
 COOKIE = "farm_session"
 
 
@@ -122,6 +124,45 @@ def add_my_product(body: ProductName, user: dict = Depends(current_user), con=De
 def remove_my_product(product: str, user: dict = Depends(current_user), con=Depends(registry)):
     store.remove_product(user["id"], product)
     return ev.product_info(con, store.products(user["id"]))
+
+
+# --- my fields (all DPBs of the user's ID JI, with their own names) ----------------------------
+class FarmJI(BaseModel):
+    ji: str
+
+
+class FieldName(BaseModel):
+    square: str
+    short_code: str
+    name: str = ""
+
+
+@app.get("/api/my-fields")
+def get_my_fields(user: dict = Depends(current_user)):
+    return my_fields.get(user["id"])
+
+
+@app.post("/api/my-fields/load")
+def load_my_fields(body: FarmJI, user: dict = Depends(current_user)):
+    try:
+        return my_fields.load(user["id"], body.ji)
+    except mf.MyFieldsError as e:
+        raise HTTPException(400, str(e))
+    except RuntimeError:
+        raise HTTPException(503, "LPIS teď neodpovídá. Zkuste to za chvíli znovu.")
+
+
+@app.put("/api/my-fields/name")
+def rename_my_field(body: FieldName, user: dict = Depends(current_user)):
+    try:
+        return my_fields.rename(user["id"], body.square, body.short_code, body.name)
+    except mf.MyFieldsError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/my-fields")
+def disconnect_my_fields(user: dict = Depends(current_user)):
+    return my_fields.disconnect(user["id"])
 
 
 # --- fields and evaluation ----------------------------------------------------------------------
