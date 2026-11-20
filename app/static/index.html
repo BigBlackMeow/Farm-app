@@ -83,14 +83,15 @@
     <h2>Výsledek</h2>
     <div id="results"><p class="muted">Vyberte pozemek a plodinu.</p></div>
     <p class="disclaimer">Aplikace slouží jako pomůcka. Závazné jsou etiketa přípravku a údaje v registru ÚKZÚZ.
-      Vzdálenost od vodních toků a ochranná pásma vodních zdrojů II. stupně zatím nevyhodnocujeme.</p>
+      Vodní toky a plochy podle ZABAGED (ČÚZK), podzemní (zatrubněné) toky se nepočítají.
+      Ochranná pásma vodních zdrojů II. stupně zatím nevyhodnocujeme.</p>
   </section>
 </main>
 <script src="/static/vendor/leaflet/leaflet.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let fieldId = null, fieldLayer = null, slopeLayer = null, lastResult = null;
+let fieldId = null, fieldLayer = null, slopeLayer = null, waterLayer = null, lastResult = null;
 
 const map = L.map("map").setView([49.8, 15.5], 7);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
@@ -123,14 +124,19 @@ async function loadField(params) {
   $("#square").value = f.square; $("#code").value = f.short_code;
   if (fieldLayer) map.removeLayer(fieldLayer);
   if (slopeLayer) map.removeLayer(slopeLayer);
+  if (waterLayer) map.removeLayer(waterLayer);
   fieldLayer = L.geoJSON(f.geometry, { style: { color: "#2f6b3a", weight: 2, fillOpacity: .15 } }).addTo(map);
   if (c.slope_near_water.geometry) slopeLayer = L.geoJSON(c.slope_near_water.geometry, { style: { color: "#a15c00", weight: 1, fillOpacity: .4 } }).addTo(map);
+  if (c.water && c.water.geometry) waterLayer = L.geoJSON(c.water.geometry, { style: { color: "#1565c0", weight: 3, fillColor: "#1565c0", fillOpacity: .35 } }).addTo(map);
   map.fitBounds(fieldLayer.getBounds(), { maxZoom: 16 });
+  const w = c.water || {};
+  const waterText = w.found ? `${w.min_distance_m.toLocaleString("cs-CZ")} m (${esc(w.nearest.name)})` : "do 60 m žádná";
   const er = c.erosion;
   $("#fieldInfo").innerHTML = `<dl class="facts">
     <dt>Díl</dt><dd>${esc(f.code)}</dd>
     <dt>Výměra</dt><dd>${f.area_ha?.toLocaleString("cs-CZ")} ha, ${esc(f.land_use)}</dd>
     <dt>Eroze</dt><dd>${esc(f.erosion || "–")}${er ? ` (SEO ${er.seo_ha} ha, MEO ${er.meo_ha} ha)` : ""}</dd>
+    <dt>Nejbližší voda</dt><dd>${waterText}</dd>
     <dt>Svah u vody</dt><dd>${c.slope_near_water.intersects ? `<span class="flag warn">ano, ${c.slope_near_water.area_ha} ha</span>` : "ne"}</dd>
     <dt>OPVZ I. st.</dt><dd>${c.opvz1_buffer.intersects ? '<span class="flag warn">v okolí 100 m</span>' : "ne"}</dd>
     <dt>Včelstva</dt><dd>${c.apiaries.count} stanovišť do ${c.apiaries.radius_m / 1000} km</dd>

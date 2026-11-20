@@ -9,13 +9,15 @@ import xml.etree.ElementTree as ET
 
 import httpx
 from pyproj import Transformer
-from shapely.geometry import MultiPoint, MultiPolygon, Point, Polygon, mapping
+from shapely.geometry import LineString, MultiPoint, MultiPolygon, Point, Polygon, mapping
 from shapely.ops import transform, unary_union
 
 WFS = "https://mze.gov.cz/public/app/wms/plpis_wfs.fcgi"
 TO_WGS = Transformer.from_crs("EPSG:5514", "EPSG:4326", always_xy=True)
 TO_JTSK = Transformer.from_crs("EPSG:4326", "EPSG:5514", always_xy=True)
 
+ZABAGED = "https://ags.cuzk.gov.cz/arcgis/rest/services/ZABAGED_POLOHOPIS/MapServer"
+WATER_SEARCH_M = 60   # registry buffer distances go up to 50 m
 BEE_RADIUS_M = 5000  # radius used to list registered apiaries near the field
 
 
@@ -184,7 +186,85 @@ def field_context(field: dict) -> dict:
         "opvz1_buffer": {"intersects": opvz_area > 1.0, "area_ha": round(opvz_area / 10000, 2)},
         "erosion": eroze,
         "apiaries": {"radius_m": r, "count": len(bees), "nearest_m": bees[0]["distance_m"] if bees else None},
+        "water": water_context(g),
+        "_field_geom": g,
     }
+
+
+def _zabaged_query(layer: int, bbox) -> list[dict]:
+    """Query a ZABAGED (ČÚZK) ArcGIS REST layer within a bbox in EPSG:5514."""
+    params = {
+        "geometry": ",".join(f"{v:.2f}" for v in bbox), "geometryType": "esriGeometryEnvelope",
+        "inSR": "5514", "outSR": "5514", "spatialRel": "esriSpatialRelIntersects",
+        "outFields": "*", "returnGeometry": "true", "f": "json",
+    }
+    last_err = None
+    for attempt in range(3):
+        try:
+            r = httpx.get(f"{ZABAGED}/{layer}/query", params=params, timeout=60)
+            r.raise_for_status()
+            data = r.json()
+            if "error" in data:
+                raise RuntimeError(str(data["error"]))
+            return data.get("features", [])
+        except (httpx.HTTPError, RuntimeError, ValueError) as e:
+            last_err = e
+            time.sleep(2 * (attempt + 1))
+    raise RuntimeError(f"ZABAGED unavailable: {last_err}")
+
+
+def water_context(g) -> dict:
+    """Surface water (ZABAGED watercourses + water areas) within WATER_SEARCH_M of the field.
+
+    Underground (piped) watercourses are skipped; intermittent ones are kept.
+    """
+    minx, miny, maxx, maxy = g.bounds
+    d = WATER_SEARCH_M
+    bb = (minx - d, miny - d, maxx + d, maxy + d)
+    items = []
+    for f in _zabaged_query(93, bb):
+        a = f["attributes"]
+        if (a.get("typtoku_p") or "").startswith("podzem"):
+            continue
+        for path in f["geometry"].get("paths", []):
+            items.append((LineString(path), a.get("jmeno") or "bezejmenný tok", a.get("vydattok_p") or ""))
+    for f in _zabaged_query(132, bb):
+        a = f["attributes"]
+        rings = f["geometry"].get("rings", [])
+        if rings:
+            poly = Polygon(rings[0], rings[1:]).buffer(0)
+            items.append((poly, a.get("jmeno") or "vodní plocha", "vodní plocha"))
+    near = [(geom, name, kind, geom.distance(g)) for geom, name, kind in items]
+    near = [x for x in near if x[3] <= d]
+    if not near:
+        return {"found": False, "min_distance_m": None, "nearest": None, "geometry": None, "_union": None}
+    near.sort(key=lambda x: x[3])
+    union = unary_union([x[0] for x in near])
+    return {
+        "found": True,
+        "min_distance_m": round(near[0][3], 1),
+        "nearest": {"name": near[0][1], "kind": near[0][2]},
+        "names": sorted({x[1] for x in near}),
+        "geometry": _to_geojson(union),
+        "_union": union,
+    }
+
+
+def area_within(field_geom, water_union, distance_m: float) -> float:
+    """Area (ha) of the field closer than distance_m to surface water."""
+    if water_union is None or distance_m <= 0:
+        return 0.0
+    return field_geom.intersection(water_union.buffer(distance_m)).area / 10000
+
+
+def public_context(ctx: dict) -> dict:
+    """Drop internal (shapely) keys before sending the context to the browser."""
+    out = {}
+    for k, v in ctx.items():
+        if k.startswith("_"):
+            continue
+        out[k] = public_context(v) if isinstance(v, dict) else v
+    return out
 
 
 def _to_geojson(geom):

@@ -7,6 +7,7 @@ Webová aplikace, která pro díl půdního bloku z LPIS a zvolenou plodinu vyp�
 ## Co umí
 
 - Načte díl půdního bloku z veřejné WFS služby LPIS, a to podle čtverce a kódu dílu nebo kliknutím do mapy.
+- Spočítá vzdálenost dílu od nejbližší povrchové vody (vodní toky a plochy ze ZABAGED, ČÚZK) a u každého přípravku porovná požadovanou ochrannou vzdálenost se skutečností. Když nestačí, ukáže, kolik hektarů pásu podél vody se nesmí ošetřit.
 - Zjistí, zda díl zasahuje do zóny svažitých pozemků u vody (vrstva `SVAZITE_100_WFS`) nebo do 100m okolí ochranného pásma vodního zdroje I. stupně. Dále ukáže erozní ohroženost (SEO/MEO) a počet registrovaných stanovišť včelstev do 5 km.
 - Pro zvolenou plodinu vypíše povolené přípravky a ke každému:
   - dávky, ochrannou lhůtu, fázi BBCH a maximální počet aplikací,
@@ -22,6 +23,7 @@ Webová aplikace, která pro díl půdního bloku z LPIS a zvolenou plodinu vyp�
 |---|---|---|
 | Registr přípravků | MZe/ÚKZÚZ, webová služba `EPH_GCP01H` (SOAP) | veřejná, bez přihlášení |
 | Díly půdních bloků, eroze, svahy u vody, OPVZ I, včely | LPIS WFS `https://mze.gov.cz/public/app/wms/plpis_wfs.fcgi` | veřejná |
+| Vodní toky a vodní plochy | ČÚZK ZABAGED, ArcGIS REST `ags.cuzk.gov.cz/.../ZABAGED_POLOHOPIS/MapServer` (vrstvy 93 a 132) | veřejná |
 | Podkladová mapa | OpenStreetMap + WMS LPIS | veřejná |
 
 ## Spuštění
@@ -36,7 +38,7 @@ Registr se mění zhruba jednou za měsíc. Import stačí spouštět jednou den
 
 ## Známá omezení
 
-- **Vodní toky** zatím nevyhodnocujeme, takže aplikace jen vypíše požadovanou ochrannou vzdálenost. Potřebná data má VÚV T.G.M. (DIBAVOD).
+- **Vodní toky:** počítají se stálé i občasné toky a vodní plochy ze ZABAGED. Podzemní (zatrubněné) toky se nepočítají. Meliorační příkopy, které v ZABAGED nejsou, aplikace nevidí.
 - **OPVZ II. stupně** v LPIS není, proto se u přípravků zobrazí jen upozornění.
 - **Kódy plodin:** veřejná služba neobsahuje číselník plodin. Přiřazení kódů k názvům odhaduje `build_crops` v `app/registry_import.py` z textů v registru.
 - **Načtení pozemku** trvá 15–25 s, protože se postupně dotazuje několik vrstev LPIS. Služba MZe občas požadavek odmítne, proto ho aplikace zkouší opakovaně.

@@ -13,6 +13,8 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
+from . import lpis
+
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "registry.sqlite"
 NOZZLE_COL = {0: "no_reduction", 50: "nozzle50", 75: "nozzle75", 90: "nozzle90"}
 BEE_DANGER = ("ZNV", "NV", "SPe8")
@@ -57,6 +59,75 @@ def _distance(v: str | None) -> str | None:
     if v is None or v == "":
         return None
     return "nelze" if v.upper() == "NELZE" else f"{v} m"
+
+
+def _cz(x: float) -> str:
+    """Czech number format: 0.35 -> 0,35."""
+    return f"{x:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
+def _metres(v: str | None) -> float | None:
+    try:
+        return float(str(v).replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def _water_area(field_ctx: dict, distance: float) -> float:
+    """Field area (ha) closer than `distance` to surface water; cached per distance."""
+    cache = field_ctx.setdefault("_area_cache", {})
+    if distance not in cache:
+        w = field_ctx.get("water") or {}
+        g = field_ctx.get("_field_geom")
+        cache[distance] = 0.0 if g is None else lpis.area_within(g, w.get("_union"), distance)
+    return cache[distance]
+
+
+def _water_checks(add, water, field_ctx: dict, nozzle: int, col: str, slope_zone: bool) -> None:
+    """Compare the product's buffer distance to surface water with the real distance on this field."""
+    w = field_ctx.get("water") or {}
+    known = "found" in w  # False only if water data were not loaded
+    nearest = w.get("min_distance_m")
+    tech = f"trysky {nozzle} %" if nozzle else "bez redukce úletu"
+    raw = water[col]
+    need = _metres(raw)
+
+    if raw and raw.upper() == "NELZE":
+        if known and not w.get("found"):
+            add("info", f"S technikou {tech} nelze použít v blízkosti vody. Do {lpis.WATER_SEARCH_M} m od pozemku voda není.")
+        else:
+            better = [f"{n} %: {water[c]} m" for n, c in ((50, "nozzle50"), (75, "nozzle75"), (90, "nozzle90"))
+                      if _metres(water[c]) is not None and n > nozzle]
+            add("warn", f"S technikou {tech} nelze použít v blízkosti vody (nejbližší voda {_cz(nearest)} m)."
+                + (f" S lepšími tryskami: {', '.join(better)}." if better else ""))
+    elif need is not None and need > 0:
+        if not known:
+            add("info", f"Ochranná vzdálenost od povrchové vody: {need:g} m ({tech}).")
+        elif not w.get("found") or nearest >= need:
+            add("info", f"Ochranná vzdálenost od vody {need:g} m ({tech}) je splněna"
+                + (f", nejbližší voda je {_cz(nearest)} m od pozemku." if nearest is not None else "."))
+        else:
+            area = _water_area(field_ctx, need)
+            add("warn", f"Ochranná vzdálenost od vody {need:g} m ({tech}): neaplikujte na pásu podél vody, "
+                f"to je {_cz(area)} ha pozemku (nejbližší voda {_cz(nearest)} m).")
+
+    if slope_zone and water["slope_buffer"]:
+        sb, vs = water["slope_buffer"], water["slope_vegetation_strip"]
+        area = _cz(field_ctx["slope_near_water"]["area_ha"])
+        if sb.upper() == "NELZE":
+            whole = field_ctx["slope_near_water"].get("share", 0) >= 0.95
+            add("block" if whole else "warn", f"Na svažité části pozemku u vody ({area} ha) přípravek použít nelze.")
+        else:
+            sbm = _metres(sb)
+            if known and sbm is not None and (not w.get("found") or nearest >= sbm):
+                add("info", f"Svažitá část pozemku u vody: ochranná vzdálenost {sb} m je splněna.")
+            else:
+                txt = f"Svažitá část pozemku u vody ({area} ha): ochranná vzdálenost {sb} m"
+                if sbm is not None and known:
+                    txt += f" (týká se {_cz(_water_area(field_ctx, sbm))} ha)"
+                if vs and vs.upper() != "NELZE":
+                    txt += f", nebo vegetační pás {vs} m"
+                add("warn", txt + ".")
 
 
 def _merge_by_product(decisions: list[dict], order: dict) -> list[dict]:
@@ -126,23 +197,7 @@ def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | Non
             add("warn", f"Povolení skončilo {d['authorized_until']}, zásoby lze spotřebovat do {d['usable_until']}.")
 
         if water is not None:
-            dist = _distance(water[col])
-            add("warn" if dist == "nelze" else "info",
-                "Ochranná vzdálenost od povrchové vody: "
-                + ("s touto technikou nelze použít v blízkosti vody" if dist == "nelze" else dist)
-                + (f" (trysky {nozzle} %)" if nozzle else " (bez redukce úletu)") + ".")
-            if slope_zone and water["slope_buffer"]:
-                sb, vs = water["slope_buffer"], water["slope_vegetation_strip"]
-                if sb.upper() == "NELZE":
-                    whole = field_ctx["slope_near_water"].get("share", 0) >= 0.95
-                    add("block" if whole else "warn",
-                        f"Na svažité části pozemku u vody ({field_ctx['slope_near_water']['area_ha']} ha) "
-                        f"přípravek použít nelze.")
-                else:
-                    txt = f"Svažitá část pozemku u vody ({field_ctx['slope_near_water']['area_ha']} ha): ochranná vzdálenost {sb} m"
-                    if vs and vs.upper() != "NELZE":
-                        txt += f", nebo vegetační pás {vs} m"
-                    add("warn", txt + ".")
+            _water_checks(add, water, field_ctx, nozzle, col, slope_zone)
         if plants is not None and _distance(plants[col]) not in (None, "0 m"):
             add("info", f"Ochranná vzdálenost od okraje pozemku (necílové rostliny): {_distance(plants[col])}.")
         if arthropods is not None and _distance(arthropods[col]) not in (None, "0 m"):

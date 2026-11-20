@@ -51,7 +51,7 @@ def field(square: str | None = None, code: str | None = None,
     if key not in _fields:
         _fields[key] = {"field": f, "ctx": lpis.field_context(f)}
     entry = _fields[key]
-    return {"field": lpis.field_public(entry["field"]), "context": entry["ctx"]}
+    return {"field": lpis.field_public(entry["field"]), "context": lpis.public_context(entry["ctx"])}
 
 
 @app.get("/api/evaluate")
