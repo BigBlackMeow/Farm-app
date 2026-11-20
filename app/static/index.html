@@ -3,175 +3,505 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Přípravky na pozemek</title>
+<title>Farm App – přípravky na pozemek</title>
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <style>
-  :root { --bg:#f6f7f4; --card:#fff; --text:#1d2a1f; --muted:#5f6b61; --line:#dfe3dc;
-          --ok:#2e7d32; --ok-bg:#e8f3e8; --warn:#a15c00; --warn-bg:#fdf2e1; --block:#b3261e; --block-bg:#fbe9e7;
-          --accent:#2f6b3a; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); }
-  header { padding:14px 20px; border-bottom:1px solid var(--line); background:var(--card); display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
-  header h1 { font-size:18px; margin:0; }
-  header .meta { color:var(--muted); font-size:13px; }
-  main { display:grid; grid-template-columns: minmax(320px, 440px) 1fr; gap:16px; padding:16px 20px; }
-  @media (max-width: 860px) { main { grid-template-columns: 1fr; padding:12px 16px; } }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
-  .card h2 { font-size:15px; margin:0 0 10px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; }
-  input, select, button { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; width:100%; background:#fff; color:var(--text); }
-  button { background:var(--accent); color:#fff; border:none; cursor:pointer; font-weight:600; margin-top:10px; }
-  button:disabled { opacity:.5; cursor:default; }
-  .row { display:flex; gap:8px; } .row > * { flex:1; }
-  #map { height:340px; border-radius:10px; border:1px solid var(--line); }
-  .facts { display:grid; grid-template-columns: auto 1fr; gap:4px 12px; font-size:14px; margin-top:10px; }
+  :root {
+    --bg:#f3f4ef; --card:#fff; --text:#18241a; --muted:#5e6a60; --line:#dde2d8;
+    --accent:#2f6b3a; --accent-dark:#214d29; --accent-soft:#e7f0e5; --gold:#c9a227;
+    --ok:#2e7d32; --ok-bg:#e8f3e8; --warn:#a15c00; --warn-bg:#fdf2e1; --block:#b3261e; --block-bg:#fbe9e7;
+    --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.05), 0 6px 24px rgba(20,40,20,.07);
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); }
+  [hidden] { display:none !important; }
+  h1, h2, h3 { line-height:1.2; }
+  a { color:var(--accent); }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 5px; font-weight:500; }
+  input, select { font:inherit; padding:11px 13px; border:1px solid var(--line); border-radius:10px; width:100%; background:#fff; color:var(--text); }
+  input:focus, select:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:transparent; }
+  .btn { font:inherit; font-weight:600; padding:11px 20px; border-radius:999px; border:1px solid transparent; cursor:pointer;
+         background:var(--accent); color:#fff; transition:background .15s, transform .05s; white-space:nowrap; }
+  .btn:hover { background:var(--accent-dark); } .btn:active { transform:translateY(1px); }
+  .btn:disabled { opacity:.45; cursor:default; background:var(--accent); }
+  .btn.ghost { background:transparent; color:var(--text); border-color:var(--line); } .btn.ghost:hover { background:#fff; }
+  .btn.small { padding:6px 12px; font-size:13px; }
+  .btn.block { width:100%; }
+  .muted { color:var(--muted); font-size:13px; }
+  .error { color:var(--block); font-size:14px; min-height:1em; margin-top:8px; }
+
+  /* ---------- login ---------- */
+  #login { min-height:100%; display:grid; place-items:center; padding:24px 16px 56px; position:relative;
+    background-color:#2b4a2f; background-position:center; background-size:cover; background-repeat:no-repeat;
+    background-image:linear-gradient(160deg, rgba(10,25,12,.55), rgba(10,25,12,.25) 50%, rgba(10,25,12,.65)),
+      url("https://images.unsplash.com/photo-1627920769541-daa658ed6b59?auto=format&fit=crop&w=2000&q=75"); }
+  .login-card { width:100%; max-width:400px; background:rgba(255,255,255,.96); border-radius:20px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:18px; letter-spacing:.2px; }
+  .brand svg { flex:none; }
+  .login-card h1 { font-size:24px; margin:18px 0 4px; }
+  .login-card p.lead { margin:0 0 16px; color:var(--muted); }
+  .tabs { display:flex; background:var(--bg); border-radius:999px; padding:4px; margin-bottom:6px; }
+  .tabs button { flex:1; border:0; background:transparent; font:inherit; font-weight:600; padding:8px; border-radius:999px; cursor:pointer; color:var(--muted); }
+  .tabs button.active { background:#fff; color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .login-card .btn { margin-top:18px; }
+  .photo-credit { position:absolute; right:14px; bottom:10px; color:rgba(255,255,255,.85); font-size:12px; }
+  .photo-credit a { color:inherit; }
+  .login-claim { position:absolute; left:28px; bottom:28px; color:#fff; max-width:520px; text-shadow:0 2px 12px rgba(0,0,0,.4); }
+  .login-claim h2 { font-size:30px; margin:0 0 6px; } .login-claim p { margin:0; opacity:.9; }
+  @media (max-width: 900px) { .login-claim { display:none; } }
+
+  /* ---------- app shell ---------- */
+  #app { min-height:100%; display:flex; flex-direction:column; }
+  .topbar { background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:1000; }
+  .topbar-in { display:flex; align-items:center; gap:16px; padding:10px 20px; max-width:1400px; margin:0 auto; }
+  .topnav { display:flex; gap:4px; margin-left:12px; }
+  .topnav button { border:0; background:transparent; font:inherit; font-weight:600; color:var(--muted); padding:8px 14px; border-radius:999px; cursor:pointer; }
+  .topnav button.active { color:var(--accent); background:var(--accent-soft); }
+  .topbar .spacer { flex:1; }
+  .user { font-size:14px; color:var(--muted); }
+  .topnav button { white-space:nowrap; }
+  @media (max-width: 640px) { .user, .topbar .brand span { display:none; } .topbar-in { padding:8px 12px; gap:6px; } .topnav { margin-left:0; } .topnav button { padding:7px 10px; font-size:14px; } }
+
+  /* stepper */
+  .stepper { display:flex; gap:0; max-width:1400px; margin:0 auto; padding:0 20px; }
+  .stepper button { flex:1; display:flex; align-items:center; gap:10px; border:0; background:transparent; font:inherit; padding:12px 4px 10px;
+    color:var(--muted); cursor:pointer; border-bottom:3px solid transparent; text-align:left; }
+  .stepper button .num { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-weight:700; font-size:14px;
+    border:2px solid var(--line); background:#fff; flex:none; }
+  .stepper button .lbl { font-weight:600; } .stepper button .sub { display:block; font-size:12px; font-weight:400; }
+  .stepper button.active { color:var(--text); border-bottom-color:var(--accent); }
+  .stepper button.active .num { border-color:var(--accent); background:var(--accent); color:#fff; }
+  .stepper button.done .num { border-color:var(--accent); color:var(--accent); }
+  .stepper button:disabled { cursor:default; opacity:.55; }
+  @media (max-width: 640px) { .stepper { padding:0 8px; } .stepper button .sub { display:none; } .stepper button { gap:6px; font-size:13px; } }
+
+  .page { flex:1; width:100%; max-width:1400px; margin:0 auto; padding:20px 20px 110px; }
+  @media (max-width: 640px) { .page { padding:14px 12px 120px; } }
+  .page-head h2 { font-size:26px; margin:0 0 4px; } .page-head p { margin:0 0 18px; color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow); }
+  .card h3 { font-size:16px; margin:0 0 6px; }
+
+  /* step 1: big map */
+  .field-grid { display:grid; grid-template-columns: minmax(0, 1fr) 360px; gap:18px; }
+  #map { height:calc(100vh - 290px); min-height:420px; border-radius:var(--radius); border:1px solid var(--line); box-shadow:var(--shadow); }
+  @media (max-width: 960px) { .field-grid { grid-template-columns:1fr; } #map { height:58vh; min-height:340px; } }
+  .row { display:flex; gap:10px; } .row > * { flex:1; min-width:0; }
+  .facts { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:14px; margin:4px 0 0; }
   .facts dt { color:var(--muted); } .facts dd { margin:0; }
-  .flag { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; font-weight:600; }
+  .map-hint { background:var(--accent-soft); color:var(--accent-dark); border-radius:10px; padding:10px 12px; font-size:14px; margin-top:14px; }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%;
+    animation:spin .8s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* step 2: options as cards */
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width: 860px) { .two-col { grid-template-columns:1fr; } }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:7px 14px; font:inherit; font-size:14px; cursor:pointer; }
+  .chip:hover { border-color:var(--accent); } .chip.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .options { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-top:12px; }
+  .option { border:2px solid var(--line); border-radius:12px; padding:14px; cursor:pointer; background:#fff; text-align:left; font:inherit; }
+  .option:hover { border-color:#b9c7b5; } .option.active { border-color:var(--accent); background:var(--accent-soft); }
+  .option b { display:block; font-size:18px; } .option span { font-size:13px; color:var(--muted); }
+  .stock-note { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+
+  /* step 3: results */
+  .summary { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
+  .flag { display:inline-block; padding:2px 10px; border-radius:99px; font-size:12px; font-weight:600; }
   .flag.ok { background:var(--ok-bg); color:var(--ok); } .flag.warn { background:var(--warn-bg); color:var(--warn); } .flag.block { background:var(--block-bg); color:var(--block); }
-  .summary { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 12px; }
-  .filters { display:flex; gap:8px; margin-bottom:10px; } .filters input { flex:1; }
-  .product { border:1px solid var(--line); border-left:4px solid var(--ok); border-radius:8px; padding:10px 12px; margin-bottom:8px; background:#fff; }
+  .flag.own { background:#f6edc8; color:#6b5300; }
+  .seg { display:inline-flex; background:#fff; border:1px solid var(--line); border-radius:999px; padding:3px; }
+  .seg button { border:0; background:transparent; font:inherit; font-size:14px; font-weight:600; padding:6px 14px; border-radius:999px; cursor:pointer; color:var(--muted); }
+  .seg button.active { background:var(--accent); color:#fff; }
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; } .toolbar input { flex:1; min-width:220px; }
+  .product { border:1px solid var(--line); border-left:5px solid var(--ok); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fff; }
   .product.warn { border-left-color:var(--warn); } .product.block { border-left-color:var(--block); }
-  .product summary { cursor:pointer; list-style:none; display:flex; justify-content:space-between; gap:8px; }
+  .product.owned { box-shadow:inset 0 0 0 1px #e6d48a; }
+  .product summary { cursor:pointer; list-style:none; display:flex; justify-content:space-between; gap:10px; }
   .product summary::-webkit-details-marker { display:none; }
-  .product summary .flag { align-self:flex-start; white-space:nowrap; }
-  .pname { font-weight:600; } .psub { color:var(--muted); font-size:13px; }
-  .checks { margin:8px 0; padding-left:18px; } .checks li { margin:2px 0; }
+  .product summary .flags { display:flex; gap:6px; align-items:flex-start; flex-wrap:wrap; justify-content:flex-end; }
+  .pname { font-weight:700; } .psub { color:var(--muted); font-size:13px; }
+  .checks { margin:10px 0; padding-left:18px; } .checks li { margin:3px 0; }
   .checks li.warn { color:var(--warn); } .checks li.block { color:var(--block); font-weight:600; }
   table { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; }
-  th, td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th, td { text-align:left; padding:5px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { color:var(--muted); font-weight:500; }
-  .muted { color:var(--muted); font-size:13px; }
-  .disclaimer { font-size:12px; color:var(--muted); margin-top:12px; }
-  .error { color:var(--block); margin-top:8px; }
   .table-wrap { overflow-x:auto; }
+  .pfoot { display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  .disclaimer { font-size:12px; color:var(--muted); margin-top:16px; }
+
+  /* stock page */
+  .stock-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  @media (max-width: 860px) { .stock-grid { grid-template-columns:1fr; } }
+  .plist { list-style:none; padding:0; margin:10px 0 0; }
+  .plist li { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .plist li:last-child { border-bottom:0; }
+
+  /* bottom bar (summary + next) */
+  .bottombar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); z-index:1000;
+    box-shadow:0 -6px 24px rgba(20,40,20,.06); }
+  .bottombar-in { max-width:1400px; margin:0 auto; padding:12px 20px; display:flex; align-items:center; gap:14px; }
+  .bottombar .sum { flex:1; min-width:0; font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bottombar .sum b { color:var(--text); }
+  @media (max-width: 640px) { .bottombar-in { padding:10px 12px; gap:8px; } .bottombar .sum { font-size:12px; white-space:normal; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Přípravky na pozemek</h1>
-  <span class="meta" id="regdate">Registr přípravků: …</span>
-</header>
-<main>
-  <section>
-    <div class="card">
-      <h2>1. Pozemek</h2>
-      <div class="row">
-        <div><label for="square">Čtverec</label><input id="square" placeholder="550-1150"></div>
-        <div><label for="code">Kód dílu</label><input id="code" placeholder="9701/26"></div>
-      </div>
-      <button id="loadField">Načíst z LPIS</button>
-      <p class="muted">Nebo klikněte na pozemek v mapě.</p>
+
+<!-- ================= login / registration ================= -->
+<section id="login" hidden>
+  <div class="login-card">
+    <div class="brand"><svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg> Farm App</div>
+    <h1 id="authTitle">Přihlášení</h1>
+    <p class="lead">Přípravky na ochranu rostlin povolené na váš pozemek.</p>
+    <div class="tabs" role="tablist">
+      <button id="tabLogin" class="active" type="button">Přihlásit</button>
+      <button id="tabRegister" type="button">Registrovat</button>
+    </div>
+    <form id="authForm" novalidate>
+      <div id="nameRow" hidden><label for="name">Jméno</label><input id="name" autocomplete="name" placeholder="Jan Novák"></div>
+      <label for="email">E-mail</label><input id="email" type="email" autocomplete="email" required>
+      <label for="password">Heslo</label><input id="password" type="password" autocomplete="current-password" required>
+      <p id="pwHint" class="muted" hidden>Aspoň 8 znaků.</p>
+      <button class="btn block" id="authBtn" type="submit">Přihlásit se</button>
+      <div id="authErr" class="error"></div>
+    </form>
+  </div>
+  <div class="login-claim"><h2>Správný přípravek na správné pole.</h2><p>Pozemek z LPIS, plodina, technika. Zbytek ohlídáme podle registru ÚKZÚZ.</p></div>
+  <div class="photo-credit">Foto: <a href="https://unsplash.com/photos/agricultural-sprayers-in-green-corn-field-jAt6cN6zl8M" target="_blank" rel="noopener">James Baltz</a> / <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a></div>
+</section>
+
+<!-- ================= application ================= -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="brand"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="#2f6b3a"/><path d="M9 22c0-7 5-12 14-12-1 9-6 13-12 13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/><path d="M11 21l6-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg><span>Farm App</span></div>
+      <nav class="topnav">
+        <button id="navWizard" class="active">Vyhodnocení</button>
+        <button id="navStock">Můj sklad <span id="stockCount"></span></button>
+      </nav>
+      <div class="spacer"></div>
+      <span class="user" id="userName"></span>
+      <button class="btn ghost small" id="logout">Odhlásit</button>
+    </div>
+    <nav class="stepper" id="stepper">
+      <button data-step="1" class="active"><span class="num">1</span><span><span class="lbl">Pozemek</span><span class="sub" id="sub1">vyberte v mapě</span></span></button>
+      <button data-step="2" disabled><span class="num">2</span><span><span class="lbl">Plodina a technika</span><span class="sub" id="sub2">co a čím stříkáte</span></span></button>
+      <button data-step="3" disabled><span class="num">3</span><span><span class="lbl">Výsledek</span><span class="sub" id="sub3">povolené přípravky</span></span></button>
+    </nav>
+  </header>
+
+  <!-- step 1 -->
+  <main class="page" id="step1">
+    <div class="page-head"><h2>Vyberte pozemek</h2><p>Přibližte mapu a klikněte na díl půdního bloku, nebo zadejte jeho kód z LPIS.</p></div>
+    <div class="field-grid">
       <div id="map"></div>
-      <div id="fieldInfo"></div>
+      <div>
+        <div class="card">
+          <h3>Najít podle kódu</h3>
+          <div class="row">
+            <div><label for="square">Čtverec</label><input id="square" placeholder="550-1150"></div>
+            <div><label for="code">Kód dílu</label><input id="code" placeholder="9701/26"></div>
+          </div>
+          <button class="btn block" id="loadField" style="margin-top:14px">Načíst z LPIS</button>
+          <div class="map-hint" id="mapHint">Tip: od přiblížení na úroveň obce se v mapě ukážou hranice dílů. Pak stačí kliknout.</div>
+        </div>
+        <div class="card" style="margin-top:16px" id="fieldCard" hidden>
+          <h3>Vybraný pozemek</h3>
+          <div id="fieldInfo"></div>
+        </div>
+      </div>
     </div>
-    <div class="card" style="margin-top:16px">
-      <h2>2. Plodina a technika</h2>
-      <label for="crop">Plodina</label>
-      <input id="crop" list="cropList" placeholder="např. pšenice ozimá" autocomplete="off">
-      <datalist id="cropList"></datalist>
-      <label for="nozzle">Trysky (redukce úletu)</label>
-      <select id="nozzle">
-        <option value="0">bez redukce</option><option value="50">50 %</option>
-        <option value="75">75 %</option><option value="90">90 %</option>
-      </select>
-      <button id="run" disabled>Vyhodnotit přípravky</button>
-      <div id="runErr" class="error"></div>
+  </main>
+
+  <!-- step 2 -->
+  <main class="page" id="step2" hidden>
+    <div class="page-head"><h2>Plodina a technika</h2><p>Co na pozemku roste a jakými tryskami budete stříkat.</p></div>
+    <div class="two-col">
+      <div class="card">
+        <h3>Plodina</h3>
+        <label for="crop">Hledat plodinu</label>
+        <input id="crop" list="cropList" placeholder="např. pšenice ozimá" autocomplete="off">
+        <datalist id="cropList"></datalist>
+        <p class="muted" style="margin:14px 0 0">Nejčastější:</p>
+        <div class="chips" id="cropChips"></div>
+      </div>
+      <div class="card">
+        <h3>Trysky (redukce úletu)</h3>
+        <p class="muted" style="margin:0">Podle redukce úletu se mění ochranná vzdálenost od vody.</p>
+        <div class="options" id="nozzles">
+          <button class="option active" data-v="0"><b>bez redukce</b><span>běžné trysky</span></button>
+          <button class="option" data-v="50"><b>50 %</b><span>antidriftové trysky</span></button>
+          <button class="option" data-v="75"><b>75 %</b><span>antidriftové trysky</span></button>
+          <button class="option" data-v="90"><b>90 %</b><span>antidriftové trysky</span></button>
+        </div>
+      </div>
     </div>
-  </section>
-  <section class="card">
-    <h2>Výsledek</h2>
-    <div id="results"><p class="muted">Vyberte pozemek a plodinu.</p></div>
+    <div class="card" style="margin-top:18px">
+      <div class="stock-note">
+        <div><h3>Můj sklad</h3><span class="muted" id="stockNote"></span></div>
+        <button class="btn ghost small" id="editStock">Upravit sklad</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- step 3 -->
+  <main class="page" id="step3" hidden>
+    <div class="page-head"><h2>Povolené přípravky</h2><p id="resultHead"></p></div>
+    <div id="results"></div>
     <p class="disclaimer">Aplikace slouží jako pomůcka. Závazné jsou etiketa přípravku a údaje v registru ÚKZÚZ.
       Vodní toky a plochy podle ZABAGED (ČÚZK), podzemní (zatrubněné) toky se nepočítají.
-      Ochranná pásma vodních zdrojů II. stupně zatím nevyhodnocujeme.</p>
-  </section>
-</main>
+      Ochranná pásma vodních zdrojů II. stupně zatím nevyhodnocujeme. <span id="regdate"></span></p>
+  </main>
+
+  <!-- stock page -->
+  <main class="page" id="stock" hidden>
+    <div class="page-head"><h2>Můj sklad</h2><p>Přípravky, které máte nakoupené. Ve výsledku se zobrazí jako první.</p></div>
+    <div class="stock-grid">
+      <div class="card">
+        <h3>Přidat přípravek</h3>
+        <label for="pq">Název nebo účinná látka</label>
+        <input id="pq" placeholder="např. Proline, tebukonazol" autocomplete="off">
+        <ul class="plist" id="psearch"></ul>
+      </div>
+      <div class="card">
+        <h3>Na skladě <span class="muted" id="stockTotal"></span></h3>
+        <ul class="plist" id="plist"></ul>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bottombar">
+    <div class="bottombar-in">
+      <button class="btn ghost" id="back" hidden>Zpět</button>
+      <div class="sum" id="sum"></div>
+      <button class="btn" id="next" disabled>Pokračovat</button>
+    </div>
+  </footer>
+</div>
+
 <script src="/static/vendor/leaflet/leaflet.js"></script>
 <script>
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let fieldId = null, fieldLayer = null, slopeLayer = null, waterLayer = null, lastResult = null;
+const num = x => Number(x).toLocaleString("cs-CZ");
 
-const map = L.map("map").setView([49.8, 15.5], 7);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
-L.tileLayer.wms("https://mze.gov.cz/public/app/wms/public_DPB_PB_OPV.fcgi", {
-  layers: "DPB_UCINNE", format: "image/png", transparent: true, minZoom: 13, attribution: "LPIS © MZe"
-}).addTo(map);
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && !path.startsWith("/api/login")) { showLogin(); throw new Error(data.detail || "Přihlaste se."); }
+  if (!r.ok) throw new Error(data.detail || "Něco se nepovedlo.");
+  return data;
+}
 
-fetch("/api/meta").then(r => r.json()).then(m => {
-  $("#regdate").textContent = "Registr přípravků ÚKZÚZ ke dni " + new Date(m.registry_date).toLocaleDateString("cs-CZ");
-});
+/* ---------------- login ---------------- */
+let registerMode = false, me = null;
+function setMode(reg) {
+  registerMode = reg;
+  $("#tabLogin").classList.toggle("active", !reg); $("#tabRegister").classList.toggle("active", reg);
+  $("#nameRow").hidden = !reg; $("#pwHint").hidden = !reg;
+  $("#authTitle").textContent = reg ? "Registrace" : "Přihlášení";
+  $("#authBtn").textContent = reg ? "Vytvořit účet" : "Přihlásit se";
+  $("#password").autocomplete = reg ? "new-password" : "current-password";
+  $("#authErr").textContent = "";
+}
+$("#tabLogin").onclick = () => setMode(false);
+$("#tabRegister").onclick = () => setMode(true);
+$("#authForm").onsubmit = async e => {
+  e.preventDefault();
+  $("#authErr").textContent = ""; $("#authBtn").disabled = true;
+  try {
+    const body = { email: $("#email").value, password: $("#password").value, name: $("#name").value };
+    me = await api(registerMode ? "/api/register" : "/api/login", { method: "POST", body: JSON.stringify(body) });
+    $("#password").value = "";
+    showApp();
+  } catch (err) { $("#authErr").textContent = err.message; }
+  $("#authBtn").disabled = false;
+};
+$("#logout").onclick = async () => { await fetch("/api/logout", { method: "POST" }); me = null; showLogin(); };
 
-let cropTimer;
-$("#crop").addEventListener("input", () => {
-  clearTimeout(cropTimer);
-  cropTimer = setTimeout(async () => {
-    const list = await (await fetch("/api/crops?q=" + encodeURIComponent($("#crop").value))).json();
-    $("#cropList").innerHTML = list.map(c => `<option value="${esc(c.name)}">`).join("");
-  }, 150);
-  updateRun();
-});
-function updateRun() { $("#run").disabled = !(fieldId && $("#crop").value.trim()); }
+function showLogin() { $("#app").hidden = true; $("#login").hidden = false; }
+async function showApp() {
+  $("#login").hidden = true; $("#app").hidden = false;
+  $("#userName").textContent = me.name || me.email;
+  initMap();
+  loadStock();
+  loadTopCrops();
+  goStep(step);
+}
+
+/* ---------------- wizard state ---------------- */
+let step = 1, fieldId = null, field = null, crop = "", nozzle = 0, lastResult = null, stock = [], view = "wizard";
+
+function goStep(n) {
+  view = "wizard"; step = n;
+  $("#navWizard").classList.add("active"); $("#navStock").classList.remove("active");
+  $("#stepper").hidden = false; $("#stock").hidden = true;
+  [1, 2, 3].forEach(i => { $("#step" + i).hidden = i !== n; });
+  $$("#stepper button").forEach(b => {
+    const s = +b.dataset.step;
+    b.classList.toggle("active", s === n);
+    b.classList.toggle("done", s < n);
+    b.disabled = !(s === 1 || (s === 2 && fieldId) || (s === 3 && lastResult));
+  });
+  if (n === 1 && map) setTimeout(() => map.invalidateSize(), 0);
+  if (n === 3 && lastResult) renderResults();
+  updateBar();
+  window.scrollTo(0, 0);
+}
+$$("#stepper button").forEach(b => b.onclick = () => goStep(+b.dataset.step));
+$("#navWizard").onclick = () => goStep(step);
+$("#navStock").onclick = showStock;
+$("#editStock").onclick = showStock;
+
+function updateBar() {
+  const parts = [];
+  if (field) parts.push(`<b>Díl ${esc(field.short_code)}</b> · ${num(field.area_ha)} ha`);
+  if (crop) parts.push(`<b>${esc(crop)}</b>`);
+  if (fieldId) parts.push(nozzle ? `trysky ${nozzle} %` : "bez redukce úletu");
+  if (view === "stock") { $("#sum").innerHTML = `<b>${stock.length}</b> přípravků na skladě`; }
+  else $("#sum").innerHTML = parts.join(" · ") || "Vyberte pozemek v mapě";
+  $("#back").hidden = view === "wizard" && step === 1;
+  const next = $("#next");
+  if (view === "stock") { next.textContent = "Zpět k vyhodnocení"; next.disabled = false; return; }
+  if (step === 1) { next.textContent = "Pokračovat: plodina"; next.disabled = !fieldId; }
+  if (step === 2) { next.textContent = "Vyhodnotit přípravky"; next.disabled = !(fieldId && crop); }
+  if (step === 3) { next.textContent = "Nový pozemek"; next.disabled = false; }
+  $("#sub1").textContent = field ? `díl ${field.short_code}` : "vyberte v mapě";
+  $("#sub2").textContent = crop || "co a čím stříkáte";
+  $("#sub3").textContent = lastResult ? `${lastResult.counts.ok + lastResult.counts.warn} použitelných` : "povolené přípravky";
+}
+$("#back").onclick = () => view === "stock" ? goStep(step) : goStep(step - 1);
+$("#next").onclick = () => {
+  if (view === "stock") return goStep(step);
+  if (step === 1) return goStep(2);
+  if (step === 2) return runEvaluation();
+  if (step === 3) { lastResult = null; goStep(1); }
+};
+
+/* ---------------- step 1: map ---------------- */
+let map = null, fieldLayer = null, slopeLayer = null, waterLayer = null;
+function initMap() {
+  if (map) return;
+  map = L.map("map").setView([49.8, 15.5], 7);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+  L.tileLayer.wms("https://mze.gov.cz/public/app/wms/public_DPB_PB_OPV.fcgi", {
+    layers: "DPB_UCINNE", format: "image/png", transparent: true, minZoom: 13, attribution: "LPIS © MZe"
+  }).addTo(map);
+  map.on("click", e => {
+    if (map.getZoom() >= 13) loadField({ lat: e.latlng.lat, lon: e.latlng.lng });
+    else { map.setView(e.latlng, Math.min(map.getZoom() + 3, 14)); }
+  });
+  map.on("zoomend", () => {
+    $("#mapHint").textContent = map.getZoom() >= 13 ? "Klikněte na díl v mapě." : "Tip: přibližte mapu. Od úrovně obce se ukážou hranice dílů a stačí kliknout.";
+  });
+}
 
 async function loadField(params) {
-  $("#fieldInfo").innerHTML = '<p class="muted">Načítám pozemek a okolní vrstvy z LPIS…</p>';
-  const r = await fetch("/api/field?" + new URLSearchParams(params));
-  const data = await r.json();
-  if (!r.ok) { $("#fieldInfo").innerHTML = `<p class="error">${esc(data.detail)}</p>`; return; }
+  $("#fieldCard").hidden = false;
+  $("#fieldInfo").innerHTML = '<p class="muted"><span class="spinner"></span>Načítám pozemek a okolní vrstvy z LPIS. Trvá to asi 20 sekund.</p>';
+  let data;
+  try { data = await api("/api/field?" + new URLSearchParams(params)); }
+  catch (err) { $("#fieldInfo").innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
   const f = data.field, c = data.context;
-  fieldId = String(f.id);
+  field = f; fieldId = String(f.id); lastResult = null;
   $("#square").value = f.square; $("#code").value = f.short_code;
-  if (fieldLayer) map.removeLayer(fieldLayer);
-  if (slopeLayer) map.removeLayer(slopeLayer);
-  if (waterLayer) map.removeLayer(waterLayer);
-  fieldLayer = L.geoJSON(f.geometry, { style: { color: "#2f6b3a", weight: 2, fillOpacity: .15 } }).addTo(map);
+  [fieldLayer, slopeLayer, waterLayer].forEach(l => l && map.removeLayer(l));
+  slopeLayer = waterLayer = null;
+  fieldLayer = L.geoJSON(f.geometry, { style: { color: "#2f6b3a", weight: 3, fillOpacity: .2 } }).addTo(map);
   if (c.slope_near_water.geometry) slopeLayer = L.geoJSON(c.slope_near_water.geometry, { style: { color: "#a15c00", weight: 1, fillOpacity: .4 } }).addTo(map);
   if (c.water && c.water.geometry) waterLayer = L.geoJSON(c.water.geometry, { style: { color: "#1565c0", weight: 3, fillColor: "#1565c0", fillOpacity: .35 } }).addTo(map);
   map.fitBounds(fieldLayer.getBounds(), { maxZoom: 16 });
   const w = c.water || {};
-  const waterText = w.found ? `${w.min_distance_m.toLocaleString("cs-CZ")} m (${esc(w.nearest.name)})` : "do 60 m žádná";
+  const waterText = w.found ? `${num(w.min_distance_m)} m (${esc(w.nearest.name)})` : "do 60 m žádná";
   const er = c.erosion;
   $("#fieldInfo").innerHTML = `<dl class="facts">
-    <dt>Díl</dt><dd>${esc(f.code)}</dd>
-    <dt>Výměra</dt><dd>${f.area_ha?.toLocaleString("cs-CZ")} ha, ${esc(f.land_use)}</dd>
+    <dt>Díl</dt><dd><b>${esc(f.code)}</b></dd>
+    <dt>Výměra</dt><dd>${num(f.area_ha)} ha, ${esc(f.land_use)}</dd>
     <dt>Eroze</dt><dd>${esc(f.erosion || "–")}${er ? ` (SEO ${er.seo_ha} ha, MEO ${er.meo_ha} ha)` : ""}</dd>
     <dt>Nejbližší voda</dt><dd>${waterText}</dd>
     <dt>Svah u vody</dt><dd>${c.slope_near_water.intersects ? `<span class="flag warn">ano, ${c.slope_near_water.area_ha} ha</span>` : "ne"}</dd>
     <dt>OPVZ I. st.</dt><dd>${c.opvz1_buffer.intersects ? '<span class="flag warn">v okolí 100 m</span>' : "ne"}</dd>
     <dt>Včelstva</dt><dd>${c.apiaries.count} stanovišť do ${c.apiaries.radius_m / 1000} km</dd>
   </dl>`;
-  updateRun();
+  goStep(1);
 }
-$("#loadField").onclick = () => loadField({ square: $("#square").value.trim(), code: $("#code").value.trim() });
-map.on("click", e => { if (map.getZoom() >= 13) loadField({ lat: e.latlng.lat, lon: e.latlng.lng }); });
-
-const LEVEL = { ok: "lze použít", warn: "s podmínkou", block: "nelze" };
-$("#run").onclick = async () => {
-  $("#runErr").textContent = "";
-  $("#results").innerHTML = '<p class="muted">Vyhodnocuji…</p>';
-  const r = await fetch("/api/evaluate?" + new URLSearchParams({ field_id: fieldId, crop: $("#crop").value.trim(), nozzle: $("#nozzle").value }));
-  const data = await r.json();
-  if (!r.ok) { $("#runErr").textContent = data.detail; $("#results").innerHTML = ""; return; }
-  lastResult = data; render();
+$("#loadField").onclick = () => {
+  const square = $("#square").value.trim(), code = $("#code").value.trim();
+  if (!square || !code) { $("#fieldCard").hidden = false; $("#fieldInfo").innerHTML = '<p class="error">Vyplňte čtverec i kód dílu.</p>'; return; }
+  loadField({ square, code });
 };
 
-function render(filter = "") {
-  const d = lastResult, q = filter.toLowerCase();
-  const items = d.products.filter(p => !q || (p.product + " " + p.uses.map(u => u.target).join(" ") + " " + p.active_substances.map(a => a.name).join(" ")).toLowerCase().includes(q));
+/* ---------------- step 2: crop and nozzles ---------------- */
+function setCrop(name) {
+  crop = name.trim(); lastResult = null;
+  $$("#cropChips .chip").forEach(c => c.classList.toggle("active", c.dataset.name === crop));
+  goStep(2);
+}
+async function loadTopCrops() {
+  if ($("#cropChips").children.length) return;
+  const list = await api("/api/crops?q=");
+  $("#cropChips").innerHTML = list.slice(0, 14).map(c => `<button class="chip" data-name="${esc(c.name)}">${esc(c.name)}</button>`).join("");
+  $$("#cropChips .chip").forEach(c => c.onclick = () => { $("#crop").value = c.dataset.name; setCrop(c.dataset.name); });
+}
+let cropTimer;
+$("#crop").addEventListener("input", () => {
+  clearTimeout(cropTimer);
+  cropTimer = setTimeout(async () => {
+    const list = await api("/api/crops?q=" + encodeURIComponent($("#crop").value));
+    $("#cropList").innerHTML = list.map(c => `<option value="${esc(c.name)}">`).join("");
+  }, 150);
+  crop = $("#crop").value.trim(); lastResult = null;
+  $$("#cropChips .chip").forEach(c => c.classList.toggle("active", c.dataset.name === crop));
+  updateBar();
+});
+$$("#nozzles .option").forEach(o => o.onclick = () => {
+  nozzle = +o.dataset.v; lastResult = null;
+  $$("#nozzles .option").forEach(x => x.classList.toggle("active", x === o));
+  updateBar();
+});
+
+async function runEvaluation() {
+  goStep(3);
+  $("#resultHead").textContent = "";
+  $("#results").innerHTML = '<p class="muted"><span class="spinner"></span>Vyhodnocuji přípravky…</p>';
+  try {
+    lastResult = await api("/api/evaluate?" + new URLSearchParams({ field_id: fieldId, crop, nozzle }));
+    resultTab = lastResult.products.some(p => p.owned) ? "own" : "all";
+    goStep(3);
+  } catch (err) { $("#results").innerHTML = `<p class="error">${esc(err.message)}</p>`; }
+}
+
+/* ---------------- step 3: results ---------------- */
+const LEVEL = { ok: "lze použít", warn: "s podmínkou", block: "nelze" };
+let resultTab = "all", resultFilter = "";
+function renderResults() {
+  const d = lastResult, q = resultFilter.toLowerCase();
+  const nOwn = d.products.filter(p => p.owned).length;
+  $("#resultHead").textContent = `Díl ${field.short_code} · ${d.crop} · ${d.nozzle ? "trysky " + d.nozzle + " %" : "bez redukce úletu"}`;
+  const items = d.products.filter(p => (resultTab === "all" || p.owned) &&
+    (!q || (p.product + " " + p.uses.map(u => u.target).join(" ") + " " + p.active_substances.map(a => a.name).join(" ")).toLowerCase().includes(q)));
+  const counts = resultTab === "own" ? d.owned_counts : d.counts;
   $("#results").innerHTML = `
-    <div class="summary">
-      <span class="flag ok">${d.counts.ok} lze použít</span>
-      <span class="flag warn">${d.counts.warn} s podmínkou</span>
-      <span class="flag block">${d.counts.block} nelze</span>
+    <div class="toolbar">
+      <div class="seg"><button data-tab="own" class="${resultTab === "own" ? "active" : ""}">Z mého skladu (${nOwn})</button><button data-tab="all" class="${resultTab === "all" ? "active" : ""}">Všechny (${d.products.length})</button></div>
+      <input id="filter" placeholder="Hledat přípravek, účinnou látku nebo škodlivý organismus" value="${esc(resultFilter)}">
     </div>
-    <div class="filters"><input id="filter" placeholder="Hledat přípravek, účinnou látku nebo škodlivý organismus" value="${esc(filter)}"></div>
+    <div class="summary">
+      <span class="flag ok">${counts.ok} lze použít</span>
+      <span class="flag warn">${counts.warn} s podmínkou</span>
+      <span class="flag block">${counts.block} nelze</span>
+    </div>
+    ${resultTab === "own" && !nOwn ? `<div class="card"><p style="margin:0">Na tuto plodinu nemáte na skladě žádný povolený přípravek.
+      Přepněte na <b>Všechny</b>, nebo si přípravky přidejte v sekci <a href="#" id="toStock">Můj sklad</a>.</p></div>` : ""}
     ${items.map(p => `
-      <details class="product ${p.level}">
+      <details class="product ${p.level}${p.owned ? " owned" : ""}">
         <summary>
           <span><span class="pname">${esc(p.product)}</span><br>
           <span class="psub">${esc(p.function)} · ${p.active_substances.map(a => esc(a.name)).join(", ")} · reg. č. ${esc(p.reg_number)}</span></span>
-          <span class="flag ${p.level}">${LEVEL[p.level]}</span>
+          <span class="flags">${p.owned ? '<span class="flag own">na skladě</span>' : ""}<span class="flag ${p.level}">${LEVEL[p.level]}</span></span>
         </summary>
         ${p.checks.length ? `<ul class="checks">${p.checks.map(c => `<li class="${c.level}">${esc(c.text)}</li>`).join("")}</ul>` : ""}
         <div class="table-wrap"><table>
@@ -179,12 +509,66 @@ function render(filter = "") {
           ${p.uses.map(u => `<tr><td>${esc(u.target)}<div class="muted">${esc(u.crop)}</div></td><td>${esc(u.dose)}</td><td>${esc(u.phi)}</td>
             <td>${u.bbch_from ?? ""}${u.bbch_to != null && u.bbch_to !== u.bbch_from ? "–" + u.bbch_to : ""}</td><td>${u.max_applications ? u.max_applications + "×" : ""}</td></tr>`).join("")}
         </table></div>
-        <p class="muted">Povolení do ${esc(p.authorized_until)}, použitelné do ${esc(p.usable_until)}.
-          ${p.documents.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">Další informace (PDF)</a>`).join(" · ")}</p>
-      </details>`).join("") || '<p class="muted">Nic nenalezeno.</p>'}`;
+        <div class="pfoot">
+          <span class="muted">Povolení do ${esc(p.authorized_until)}, použitelné do ${esc(p.usable_until)}.
+            ${p.documents.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">Další informace (PDF)</a>`).join(" · ")}</span>
+          <button class="btn ghost small" data-own="${esc(p.product)}">${p.owned ? "Odebrat ze skladu" : "+ Přidat do skladu"}</button>
+        </div>
+      </details>`).join("") || (resultTab === "own" && !nOwn ? "" : '<p class="muted">Nic nenalezeno.</p>')}`;
+  $$("#results .seg button").forEach(b => b.onclick = () => { resultTab = b.dataset.tab; renderResults(); });
+  const ts = $("#toStock"); if (ts) ts.onclick = e => { e.preventDefault(); showStock(); };
+  $$("#results [data-own]").forEach(b => b.onclick = async () => {
+    const name = b.dataset.own, p = lastResult.products.find(x => x.product === name);
+    await (p.owned ? removeStock(name) : addStock(name));
+    p.owned = !p.owned;
+    const o = lastResult.owned_counts; o[p.level] += p.owned ? 1 : -1;
+    const open = b.closest("details").open;
+    renderResults();
+    if (open) { const el = [...$$("#results [data-own]")].find(x => x.dataset.own === name); el && (el.closest("details").open = true); }
+  });
   const inp = $("#filter");
-  inp.oninput = () => { const v = inp.value, pos = inp.selectionStart; render(v); const n = $("#filter"); n.focus(); n.setSelectionRange(pos, pos); };
+  inp.oninput = () => { const pos = inp.selectionStart; resultFilter = inp.value; renderResults(); const n = $("#filter"); n.focus(); n.setSelectionRange(pos, pos); };
 }
+
+/* ---------------- my stock ---------------- */
+function renderStock() {
+  $("#stockCount").textContent = stock.length ? `(${stock.length})` : "";
+  $("#stockTotal").textContent = stock.length ? `(${stock.length})` : "";
+  $("#stockNote").textContent = stock.length
+    ? `Máte ${stock.length} přípravků. Ve výsledku je uvidíte jako první.`
+    : "Zatím prázdný. Přidejte si nakoupené přípravky a ve výsledku je uvidíte jako první.";
+  $("#plist").innerHTML = stock.map(p => `<li><span><b>${esc(p.product)}</b><br><span class="muted">${esc(p.function)}${p.active_substances.length ? " · " + p.active_substances.map(esc).join(", ") : ""}${p.known ? "" : "není v registru"}</span></span>
+    <button class="btn ghost small" data-rm="${esc(p.product)}">Odebrat</button></li>`).join("") || '<li class="muted">Zatím nic. Vyhledejte přípravek vlevo.</li>';
+  $$("#plist [data-rm]").forEach(b => b.onclick = async () => { await removeStock(b.dataset.rm); searchProducts(); });
+  updateBar();
+}
+async function loadStock() { stock = await api("/api/my-products"); renderStock(); }
+async function addStock(product) { stock = await api("/api/my-products", { method: "POST", body: JSON.stringify({ product }) }); renderStock(); }
+async function removeStock(product) { stock = await api("/api/my-products?" + new URLSearchParams({ product }), { method: "DELETE" }); renderStock(); }
+function showStock() {
+  view = "stock";
+  $("#navStock").classList.add("active"); $("#navWizard").classList.remove("active");
+  $("#stepper").hidden = true; [1, 2, 3].forEach(i => $("#step" + i).hidden = true); $("#stock").hidden = false;
+  searchProducts(); updateBar(); window.scrollTo(0, 0);
+}
+let pTimer;
+async function searchProducts() {
+  const q = $("#pq").value.trim();
+  if (q.length < 2) { $("#psearch").innerHTML = '<li class="muted">Napište aspoň 2 písmena.</li>'; return; }
+  const list = await api("/api/products?q=" + encodeURIComponent(q));
+  const have = new Set(stock.map(s => s.product));
+  $("#psearch").innerHTML = list.map(p => `<li><span><b>${esc(p.product)}</b><br><span class="muted">${esc(p.function)} · ${p.active_substances.map(esc).join(", ")}</span></span>
+    ${have.has(p.product) ? '<span class="flag own">na skladě</span>' : `<button class="btn small" data-add="${esc(p.product)}">Přidat</button>`}</li>`).join("")
+    || '<li class="muted">Nic nenalezeno.</li>';
+  $$("#psearch [data-add]").forEach(b => b.onclick = async () => { await addStock(b.dataset.add); searchProducts(); });
+}
+$("#pq").addEventListener("input", () => { clearTimeout(pTimer); pTimer = setTimeout(searchProducts, 200); });
+
+/* ---------------- start ---------------- */
+fetch("/api/meta").then(r => r.json()).then(m => {
+  if (m.registry_date) $("#regdate").textContent = "Registr přípravků ÚKZÚZ ke dni " + new Date(m.registry_date).toLocaleDateString("cs-CZ") + ".";
+});
+fetch("/api/me").then(r => r.ok ? r.json() : null).then(u => { if (u) { me = u; showApp(); } else showLogin(); });
 </script>
 </body>
 </html>

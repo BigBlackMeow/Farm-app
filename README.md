@@ -16,6 +16,8 @@ Webová aplikace, která pro díl půdního bloku z LPIS a zvolenou plodinu vyp�
   - vyloučení v OPVZ II. stupně, rizika pro včely, omezení kvůli podzemní vodě,
   - konec povolení a lhůtu pro spotřebování zásob.
 - Výsledek rozdělí na „lze použít“, „s podmínkou“ a „nelze“.
+- Uživatel se registruje e-mailem a heslem (účty se ukládají do `data/users.sqlite`). Ve „Mém skladu“ si vede nakoupené přípravky; ty se ve výsledku zobrazí jako první a dají se zobrazit samostatně.
+- Rozhraní je průvodce ve třech krocích: 1. pozemek (velká mapa), 2. plodina a trysky, 3. výsledek.
 
 ## Zdroje dat
 
@@ -71,4 +73,5 @@ Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python 
 - `app/lpis.py`: dotazy na LPIS WFS a prostorové kontroly
 - `app/evaluate.py`: vyhodnocení přípravků pro pozemek a plodinu
 - `app/main.py`: API (FastAPI)
-- `app/static/index.html`: webové rozhraní (Leaflet)
+- `app/users.py`: účty, přihlášení (heslo hashované scryptem, cookie) a sklad přípravků; ukládá se do `data/users.sqlite`
+- `app/static/index.html`: webové rozhraní (Leaflet). Fotka na přihlašovací obrazovce: James Baltz, [Unsplash](https://unsplash.com/photos/agricultural-sprayers-in-green-corn-field-jAt6cN6zl8M) (licence Unsplash).
