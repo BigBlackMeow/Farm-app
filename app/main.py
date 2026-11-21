@@ -45,6 +45,18 @@ support = sup.Support(store)
 COOKIE = "farm_session"
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Basic browser protections for when the app runs on the public web."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
+
+
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
@@ -64,6 +76,19 @@ def current_user(request: Request) -> dict:
     return user
 
 
+def admin_user(user: dict = Depends(current_user)) -> dict:
+    if not user.get("is_admin"):
+        raise HTTPException(403, "Tohle může jen správce aplikace.")
+    return user
+
+
+def client_ip(request: Request) -> str:
+    """The visitor's address. Behind Cloudflare the real one is in CF-Connecting-IP."""
+    return (request.headers.get("cf-connecting-ip")
+            or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+            or (request.client.host if request.client else ""))
+
+
 def _set_cookie(request: Request, response: Response, token: str) -> None:
     response.set_cookie(COOKIE, token, max_age=users.SESSION_DAYS * 86400, httponly=True, samesite="lax",
                         secure=request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https")
@@ -72,7 +97,7 @@ def _set_cookie(request: Request, response: Response, token: str) -> None:
 @app.post("/api/register")
 def register(body: Credentials, request: Request, response: Response):
     try:
-        s = store.register(body.email, body.password, body.name)
+        s = store.register(body.email, body.password, body.name, client_ip(request))
     except users.AuthError as e:
         raise HTTPException(400, str(e))
     _set_cookie(request, response, s["token"])
@@ -82,7 +107,7 @@ def register(body: Credentials, request: Request, response: Response):
 @app.post("/api/login")
 def login(body: Credentials, request: Request, response: Response):
     try:
-        s = store.login(body.email, body.password)
+        s = store.login(body.email, body.password, client_ip(request))
     except users.AuthError as e:
         raise HTTPException(400, str(e))
     _set_cookie(request, response, s["token"])
@@ -99,6 +124,76 @@ def logout(request: Request, response: Response):
 @app.get("/api/me")
 def me(user: dict = Depends(current_user)):
     return user
+
+
+# --- my account: password, sessions, deleting the account; administrator: list and delete users -----
+class PasswordChange(BaseModel):
+    current: str
+    new: str
+
+
+class Password(BaseModel):
+    password: str
+
+
+class Name(BaseModel):
+    name: str
+
+
+@app.get("/api/account")
+def account(user: dict = Depends(current_user)):
+    return {**user, "sessions": store.session_count(user["id"])}
+
+
+@app.put("/api/account/name")
+def account_name(body: Name, user: dict = Depends(current_user)):
+    store.update_name(user["id"], body.name)
+    return {**user, "name": body.name.strip()[:80]}
+
+
+@app.post("/api/account/password")
+def account_password(body: PasswordChange, request: Request, user: dict = Depends(current_user)):
+    try:
+        store.change_password(user["id"], body.current, body.new, request.cookies.get(COOKIE))
+    except users.AuthError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/account/logout-everywhere")
+def account_logout_everywhere(request: Request, user: dict = Depends(current_user)):
+    return {"ended": store.logout_everywhere(user["id"], request.cookies.get(COOKIE))}
+
+
+@app.post("/api/account/delete")
+def account_delete(body: Password, response: Response, user: dict = Depends(current_user)):
+    try:
+        store.delete_account(user["id"], body.password)
+    except users.AuthError as e:
+        raise HTTPException(400, str(e))
+    response.delete_cookie(COOKIE)
+    return {"ok": True}
+
+
+@app.get("/api/admin/users")
+def admin_users(admin: dict = Depends(admin_user)):
+    return store.list_users()
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: int, admin: dict = Depends(admin_user)):
+    if user_id == admin["id"]:
+        raise HTTPException(400, "Svůj vlastní účet smažete v části Můj účet.")
+    if not any(u["id"] == user_id for u in store.list_users()):
+        raise HTTPException(404, "Účet nenalezen.")
+    store.delete_user(user_id)
+    return store.list_users()
+
+
+@app.post("/api/admin/users/{user_id}/logout")
+def admin_logout_user(user_id: int, admin: dict = Depends(admin_user)):
+    store.logout_everywhere(user_id)
+    return store.list_users()
 
 
 # --- my purchased products ("můj sklad") --------------------------------------------------------
@@ -329,7 +424,7 @@ class SupportSetup(BaseModel):
 
 
 @app.post("/api/support/setup")
-def support_setup(body: SupportSetup, user: dict = Depends(current_user)):
+def support_setup(body: SupportSetup, user: dict = Depends(admin_user)):
     """One-time setup from the Podpora page: saves the Web3Forms key to data/nastaveni.json (not in git).
     Only allowed while no key is set, so nobody can quietly redirect the messages later."""
     if config.support_key():

@@ -36,6 +36,20 @@ def support_email() -> str:
     return os.environ.get("SUPPORT_EMAIL") or str(_load().get("email_podpory", "")).strip()
 
 
+def admin_emails() -> set[str]:
+    """E-mails of administrators, who can see and delete user accounts and set up the support form.
+
+    Set ADMIN_EMAILS (comma separated) on the web server, or "spravci": ["vas@email.cz"] in
+    data/nastaveni.json. If neither is set, the oldest account in the app is the administrator.
+    """
+    raw = os.environ.get("ADMIN_EMAILS")
+    if raw is None:
+        raw = _load().get("spravci", "")
+    if isinstance(raw, list):
+        raw = ",".join(str(x) for x in raw)
+    return {e.strip().lower() for e in str(raw).split(",") if e.strip()}
+
+
 def save(**values: str) -> None:
     data = _load()
     data.update(values)
