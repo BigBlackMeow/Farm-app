@@ -32,16 +32,17 @@ chown -R farmapp:farmapp "$DIR"
 
 echo "== 3/5 Registr přípravků (poprvé asi 4 minuty)"
 if [ ! -f "$DIR/data/registry.sqlite" ]; then
-  # Když služba MZe zrovna nejede, nevadí: registr se nahraje spolu se složkou data z vašeho počítače.
+  # Když služba MZe zrovna nejede, nevadí: server to pak zkouší každou hodinu (farm-app-registr-chybi.timer).
   (cd "$DIR" && sudo -u farmapp .venv/bin/python -m app.registry_import) \
-    || echo "Registr se teď stáhnout nepodařilo. Nahrajte složku data z počítače (viz README)."
+    || echo "Registr se teď stáhnout nepodařilo. Server to bude zkoušet každou hodinu sám."
 fi
 
 echo "== 4/5 Služby (aplikace, měsíční registr, denní záloha)"
 cp "$DIR/deploy/farm-app.service" "$DIR/deploy/farm-app-registr.service" "$DIR/deploy/farm-app-registr.timer" \
-   "$DIR/deploy/farm-app-zaloha.service" "$DIR/deploy/farm-app-zaloha.timer" /etc/systemd/system/
+   "$DIR/deploy/farm-app-zaloha.service" "$DIR/deploy/farm-app-zaloha.timer" \
+   "$DIR/deploy/farm-app-registr-chybi.service" "$DIR/deploy/farm-app-registr-chybi.timer" /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable -q --now farm-app.service farm-app-registr.timer farm-app-zaloha.timer
+systemctl enable -q --now farm-app.service farm-app-registr.timer farm-app-zaloha.timer farm-app-registr-chybi.timer
 systemctl restart farm-app.service
 
 echo "== 5/5 Cloudflare Tunnel"

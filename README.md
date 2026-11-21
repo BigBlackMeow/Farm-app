@@ -98,9 +98,9 @@ Na serveru zadejte (místo `TOKEN` vložte token z Cloudflare):
 curl -fsSL https://raw.githubusercontent.com/BigBlackMeow/Farm-app/main/deploy/instalace-serveru.sh | bash -s -- TOKEN
 ```
 
-Instalace trvá pár minut. Na konci napíše „HOTOVO“.
+Instalace trvá pár minut. Na konci napíše „HOTOVO“. Když se registr přípravků zrovna nedá stáhnout (služba MZe nejede), server to sám zkouší každou hodinu, dokud se to nepovede.
 
-**3. Přenesení vašich dat z počítače**
+**3. Přenesení vašich dat z počítače (jen pokud nějaká máte)**
 
 Ve Windows otevřete příkazový řádek ve složce aplikace (tam, kde je složka `data`) a zadejte:
 

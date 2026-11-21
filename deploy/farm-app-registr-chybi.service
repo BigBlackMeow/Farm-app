@@ -1,0 +1,10 @@
+[Unit]
+Description=Farm App: stáhnout registr, dokud chybí (např. po údržbě služby MZe)
+ConditionPathExists=!/opt/farm-app/data/registry.sqlite
+
+[Service]
+Type=oneshot
+User=farmapp
+WorkingDirectory=/opt/farm-app
+ExecStart=/opt/farm-app/.venv/bin/python -m app.registry_import
+ExecStartPost=+/bin/systemctl restart farm-app.service
