@@ -270,4 +270,11 @@ if __name__ == "__main__":
     if "--crops-only" in sys.argv:
         print({"crops": rebuild_crops()})
     else:
-        print(import_registry())
+        try:
+            print(import_registry())
+        except (httpx.HTTPError, RuntimeError, ET.ParseError) as e:
+            print("\nNepodařilo se stáhnout registr přípravků z MZe (eAGRI).", file=sys.stderr)
+            print("Služba je asi dočasně nedostupná (výpadek nebo plánovaná údržba). Zkuste to později.", file=sys.stderr)
+            print("Vaše dosavadní data zůstala beze změny, aplikace s nimi dál funguje.", file=sys.stderr)
+            print(f"(technický detail: {type(e).__name__}: {str(e)[:200]})", file=sys.stderr)
+            sys.exit(1)
