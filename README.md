@@ -16,7 +16,7 @@ Webová aplikace, která pro díl půdního bloku z LPIS a zvolenou plodinu vyp�
   - vyloučení v OPVZ II. stupně, rizika pro včely, omezení kvůli podzemní vodě,
   - konec povolení a lhůtu pro spotřebování zásob.
 - Výsledek rozdělí na „lze použít“, „s podmínkou“ a „nelze“.
-- Uživatel se registruje e-mailem a heslem (účty se ukládají do `data/users.sqlite`). Ve „Mém skladu“ si vede nakoupené přípravky; ty se ve výsledku zobrazí jako první a dají se zobrazit samostatně.
+- Uživatel se registruje e-mailem a heslem (účty se ukládají do `data/users.sqlite`). Ve „Mém skladu“ si vede nakoupené přípravky; ty se ve výsledku zobrazí jako první a dají se zobrazit samostatně. U každého přípravku může zadat svou nákupní cenu (Kč za l nebo kg); vyhodnocení pak ukáže náklady na hektar a na celý díl a evidence postřiků náklady každého zásahu i součet za období. Veřejný ceník profesionálních přípravků v ČR neexistuje (ceny se liší podle distributora a smlouvy), proto ceny zadává každý sám.
 - **Moje pole:** uživatel zadá své ID JI (číslo uživatele v LPIS), nebo klikne v mapě na kterékoli své pole a zvolí „Tohle je moje pole“. Aplikace načte z veřejného LPIS všechny jeho díly, zvýrazní je v mapě a ukáže u nich názvy. Pole si může pojmenovat (např. „Za humny“), vyhledat podle názvu nebo kódu a vybrat kliknutím. Volba „V mapě ukázat jen moje pole“ skryje cizí díly. Přihlašovat se do eAGRI není potřeba: ID JI uživatele je u každého dílu ve veřejné WFS službě LPIS. Názvy se ukládají do `data/users.sqlite` a po novém načtení z LPIS zůstanou.
 - **Podpora:** v horní liště je stránka „Podpora“ s formulářem pro nahlášení chyby, návrh nové funkce nebo dotaz. Zpráva se vždy uloží do `data/users.sqlite` a zároveň se odešle e-mailem přes bezplatnou službu [Web3Forms](https://web3forms.com). K chybě se dají přiložit technické údaje (prohlížeč, vybraný pozemek a plodina). Uživatel vidí své zprávy a ty neodeslané může odeslat znovu.
 - Rozhraní je průvodce ve třech krocích: 1. pozemek (velká mapa), 2. plodina a trysky, 3. výsledek.
@@ -85,7 +85,8 @@ Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python 
 - `app/evaluate.py`: vyhodnocení přípravků pro pozemek a plodinu
 - `app/main.py`: API (FastAPI)
 - `app/records.py`: evidence postřiků, export do CSV a tisková sestava
-- `app/users.py`: účty, přihlášení a sklad přípravků; ukládá se do `data/users.sqlite`. Hesla se neukládají, jen jejich otisk (scrypt se solí). Přihlašovací cookie je náhodný token a v databázi je jen jeho otisk (SHA-256). Po 5 špatných heslech za 15 minut se přihlášení na chvíli zablokuje.
+- `app/users.py`: účty, přihlášení a sklad přípravků s cenami; ukládá se do `data/users.sqlite`. Hesla se neukládají, jen jejich otisk (scrypt se solí). Přihlašovací cookie je náhodný token a v databázi je jen jeho otisk (SHA-256). Po 5 špatných heslech za 15 minut se přihlášení na chvíli zablokuje.
+- `app/prices.py`: přepočet ceny za l/kg na náklady na hektar, díl a záznam postřiku
 - `app/static/index.html`: webové rozhraní (Leaflet). Fotka na přihlašovací obrazovce: James Baltz, [Unsplash](https://unsplash.com/photos/agricultural-sprayers-in-green-corn-field-jAt6cN6zl8M) (licence Unsplash).
 
 ## Můj účet a správce
