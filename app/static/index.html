@@ -133,6 +133,11 @@
   .seg { display:inline-flex; background:#fff; border:1px solid var(--line); border-radius:999px; padding:3px; }
   .seg button { border:0; background:transparent; font:inherit; font-size:14px; font-weight:600; padding:6px 14px; border-radius:999px; cursor:pointer; color:var(--muted); }
   .seg button.active { background:var(--accent); color:#fff; }
+  .type-filter { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:0 0 10px; }
+  .type-filter .chip { padding:5px 12px; font-size:13px; }
+  .tf-label, .target-filter label { font-size:13px; font-weight:600; color:var(--muted); margin:0; }
+  .target-filter { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 12px; }
+  .target-filter select { flex:1; min-width:200px; max-width:100%; }
   .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; } .toolbar input { flex:1; min-width:220px; }
   .product { border:1px solid var(--line); border-left:5px solid var(--ok); border-radius:12px; padding:12px 14px; margin-bottom:10px; background:#fff; }
   .product.warn { border-left-color:var(--warn); } .product.block { border-left-color:var(--block); }
@@ -902,29 +907,56 @@ async function runEvaluation() {
   try {
     lastResult = await api("/api/evaluate?" + new URLSearchParams({ field_id: fieldId, crop, nozzle }));
     resultTab = lastResult.products.some(p => p.owned) ? "own" : "all";
+    resultType = resultTarget = "";
     goStep(3);
   } catch (err) { $("#results").innerHTML = `<p class="error">${esc(err.message)}</p>`; }
 }
 
 /* ---------------- step 3: results ---------------- */
 const LEVEL = { ok: "lze použít", warn: "s podmínkou", block: "nelze" };
-let resultTab = "all", resultFilter = "";
+let resultTab = "all", resultFilter = "", resultType = "", resultTarget = "";
+const byCount = (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "cs");
+function useMatches(u) { return !resultTarget || (u.targets || [u.target]).includes(resultTarget); }
 function renderResults() {
   const d = lastResult, q = resultFilter.toLowerCase();
   const nOwn = d.products.filter(p => p.owned).length;
   $("#resultHead").textContent = `${fieldTitle()} · ${d.crop} · ${d.nozzle ? "trysky " + d.nozzle + " %" : "bez redukce úletu"}`;
-  const items = d.products.filter(p => (resultTab === "all" || p.owned) &&
+  const inTab = d.products.filter(p => resultTab === "all" || p.owned);
+  // product types (herbicid, fungicid, ...) present in this tab
+  const typeN = new Map();
+  inTab.forEach(p => (p.types || []).forEach(t => typeN.set(t, (typeN.get(t) || 0) + 1)));
+  if (resultType && !typeN.has(resultType)) resultType = "";
+  const inType = inTab.filter(p => !resultType || (p.types || []).includes(resultType));
+  // target pests / diseases / weeds for the chosen type
+  const targetN = new Map();
+  inType.forEach(p => new Set(p.uses.flatMap(u => u.targets || [u.target])).forEach(t => t && targetN.set(t, (targetN.get(t) || 0) + 1)));
+  if (resultTarget && !targetN.has(resultTarget)) resultTarget = "";
+  const items = inType.filter(p => p.uses.some(useMatches) &&
     (!q || (p.product + " " + p.uses.map(u => u.target).join(" ") + " " + p.active_substances.map(a => a.name).join(" ")).toLowerCase().includes(q)));
-  const counts = resultTab === "own" ? d.owned_counts : d.counts;
+  const counts = { ok: 0, warn: 0, block: 0 };
+  items.forEach(p => counts[p.level]++);
+  const filtered = resultType || resultTarget || q;
   $("#results").innerHTML = `
     <div class="toolbar">
       <div class="seg"><button data-tab="own" class="${resultTab === "own" ? "active" : ""}">Z mého skladu (${nOwn})</button><button data-tab="all" class="${resultTab === "all" ? "active" : ""}">Všechny (${d.products.length})</button></div>
       <input id="filter" placeholder="Hledat přípravek, účinnou látku nebo škodlivý organismus" value="${esc(resultFilter)}">
     </div>
+    ${typeN.size > 1 || resultType ? `<div class="type-filter" aria-label="Typ přípravku">
+      <span class="tf-label">Na co:</span>
+      <button class="chip ${resultType ? "" : "active"}" data-type="">Vše (${inTab.length})</button>
+      ${[...typeN].sort(byCount).map(([t, n]) => `<button class="chip ${t === resultType ? "active" : ""}" data-type="${esc(t)}">${esc(t)} (${n})</button>`).join("")}
+    </div>` : ""}
+    ${targetN.size > 1 || resultTarget ? `<div class="target-filter">
+      <label for="targetSel">Škodlivý organismus</label>
+      <select id="targetSel"><option value="">Všechny (${targetN.size})</option>
+        ${[...targetN].sort(byCount).map(([t, n]) => `<option value="${esc(t)}" ${t === resultTarget ? "selected" : ""}>${esc(t)} (${n} ${n === 1 ? "přípravek" : n < 5 ? "přípravky" : "přípravků"})</option>`).join("")}
+      </select>
+    </div>` : ""}
     <div class="summary">
       <span class="flag ok">${counts.ok} lze použít</span>
       <span class="flag warn">${counts.warn} s podmínkou</span>
       <span class="flag block">${counts.block} nelze</span>
+      ${filtered ? `<span class="muted" style="font-size:13px">zobrazeno ${items.length} z ${inTab.length}</span> <button class="btn ghost small" id="clearFilters">Zrušit filtry</button>` : ""}
     </div>
     ${resultTab === "own" && !nOwn ? `<div class="card"><p style="margin:0">Na tuto plodinu nemáte na skladě žádný povolený přípravek.
       Přepněte na <b>Všechny</b>, nebo si přípravky přidejte v sekci <a href="#" id="toStock">Můj sklad</a>.</p></div>` : ""}
@@ -938,7 +970,7 @@ function renderResults() {
         ${p.checks.length ? `<ul class="checks">${p.checks.map(c => `<li class="${c.level}">${esc(c.text)}</li>`).join("")}</ul>` : ""}
         <div class="table-wrap"><table>
           <tr><th>Škodlivý organismus</th><th>Dávka</th>${p.price ? "<th>Náklady</th>" : ""}<th>OL (dny)</th><th>BBCH</th><th>Max.</th></tr>
-          ${p.uses.map(u => `<tr><td>${esc(u.target)}<div class="muted">${esc(u.crop)}</div></td><td>${esc(u.dose)}</td>${p.price ? `<td class="cost">${costCell(u.cost)}</td>` : ""}<td>${esc(u.phi)}</td>
+          ${p.uses.filter(useMatches).map(u => `<tr><td>${esc(u.target)}<div class="muted">${esc(u.crop)}</div></td><td>${esc(u.dose)}</td>${p.price ? `<td class="cost">${costCell(u.cost)}</td>` : ""}<td>${esc(u.phi)}</td>
             <td>${u.bbch_from ?? ""}${u.bbch_to != null && u.bbch_to !== u.bbch_from ? "–" + u.bbch_to : ""}</td><td>${u.max_applications ? u.max_applications + "×" : ""}</td></tr>`).join("")}
         </table></div>
         <div class="price-box price-row">
@@ -958,6 +990,9 @@ function renderResults() {
         </div>
       </details>`).join("") || (resultTab === "own" && !nOwn ? "" : '<p class="muted">Nic nenalezeno.</p>')}`;
   $$("#results .seg button").forEach(b => b.onclick = () => { resultTab = b.dataset.tab; renderResults(); });
+  $$("#results [data-type]").forEach(b => b.onclick = () => { resultType = b.dataset.type; resultTarget = ""; renderResults(); });
+  const tsel = $("#targetSel"); if (tsel) tsel.onchange = () => { resultTarget = tsel.value; renderResults(); };
+  const cf = $("#clearFilters"); if (cf) cf.onclick = () => { resultType = resultTarget = resultFilter = ""; renderResults(); };
   const ts = $("#toStock"); if (ts) ts.onclick = e => { e.preventDefault(); showStock(); };
   $$("#results [data-own]").forEach(b => b.onclick = async () => {
     const name = b.dataset.own, p = lastResult.products.find(x => x.product === name);

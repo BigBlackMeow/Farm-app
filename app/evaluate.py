@@ -9,6 +9,7 @@ Decision support only: the product label (etiketa) and the registry remain bindi
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -79,6 +80,50 @@ def product_info(con, names: list[str]) -> list[dict]:
             out.append({"product": n, "function": r["function"], "known": True, "usable_until": r["until"],
                         "active_substances": [a["name"] for a in json.loads(r["subs"])]})
     return out
+
+
+# Product types for the result filter: registry function text (B_FCE) -> friendly group name.
+# Checked in this order; anything unknown keeps its own name.
+TYPE_GROUPS = (
+    ("herbicid", "Herbicid"), ("fungicid", "Fungicid"), ("insekticid", "Insekticid"),
+    ("akaricid", "Akaricid"), ("moluskocid", "Moluskocid"), ("nematocid", "Nematocid"),
+    ("rodenticid", "Rodenticid"), ("baktericid", "Baktericid"), ("regulátor", "Regulátor růstu"),
+    ("růst", "Regulátor růstu"), ("desikant", "Desikant"), ("defoliant", "Desikant"),
+    ("repelent", "Repelent"), ("feromon", "Feromon"), ("smáčed", "Pomocný prostředek"),
+    ("pomocn", "Pomocný prostředek"), ("adjuvant", "Pomocný prostředek"), ("mořidl", "Mořidlo"),
+)
+
+
+def product_types(function: str) -> list[str]:
+    """'Fungicid, insekticid' -> ['Fungicid', 'Insekticid']; used to filter results by type."""
+    out: list[str] = []
+    for part in re.split(r"[,;/+]|\s+a\s+", function or ""):
+        part = part.strip(" .").lower()
+        if not part:
+            continue
+        hits = [name for key, name in TYPE_GROUPS if key in part] or [part[:1].upper() + part[1:]]
+        for h in hits:
+            if h not in out:
+                out.append(h)
+    return out or ["Neuvedeno"]
+
+
+def split_targets(text: str) -> list[str]:
+    """Split a registry target text ('plíseň bramborová, alternáriová skvrnitost') into
+    organisms, ignoring commas inside brackets."""
+    parts, depth, cur = [], 0, ""
+    for ch in text or "":
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        if ch in ",;" and depth <= 0:
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    parts.append(cur)
+    return [t for t in (re.sub(r"\s+", " ", x).strip(" .") for x in parts) if t]
 
 
 def _pick_buffer(rows, codes: set[str]):
@@ -180,7 +225,7 @@ def _merge_by_product(decisions: list[dict], order: dict) -> list[dict]:
         m = merged.get(d["product"])
         if m is None:
             merged[d["product"]] = {**d, "reg_number": d["reg_number"], "checks": list(d["checks"]),
-                                    "uses": list(d["uses"]), "documents": list(d["documents"])}
+                                    "uses": list(d["uses"]), "types": list(d["types"]), "documents": list(d["documents"])}
             continue
         if d["reg_number"] not in m["reg_number"].split(", "):
             m["reg_number"] += ", " + d["reg_number"]
@@ -192,6 +237,9 @@ def _merge_by_product(decisions: list[dict], order: dict) -> list[dict]:
         for u in d["uses"]:
             if u not in m["uses"]:
                 m["uses"].append(u)
+        for t in d["types"]:
+            if t not in m["types"]:
+                m["types"].append(t)
         for x in d["documents"]:
             if x not in m["documents"]:
                 m["documents"].append(x)
@@ -272,13 +320,14 @@ def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | Non
             "product": d["product"],
             "reg_number": d["reg_number"],
             "function": d["function"],
+            "types": product_types(d["function"]),
             "active_substances": json.loads(d["active_substances"]),
             "authorized_until": d["authorized_until"],
             "usable_until": d["usable_until"],
             "level": level,
             "checks": checks,
             "uses": [{
-                "crop": u["crop_text"], "target": u["target"], "dose": u["dose_text"], "phi": u["phi"],
+                "crop": u["crop_text"], "target": u["target"], "targets": split_targets(u["target"]), "dose": u["dose_text"], "phi": u["phi"],
                 "bbch_from": u["bbch_from"], "bbch_to": u["bbch_to"],
                 "max_applications": u["max_applications"], "note": u["note"],
                 "dose_min": u["dose_min"], "dose_max": u["dose_max"], "dose_unit": u["dose_unit"],
@@ -309,4 +358,14 @@ def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | Non
         "area_ha": area_ha,
         "owned_counts": {k: sum(1 for p in products if p["level"] == k and p["owned"]) for k in order},
         "products": products,
+        "types": _type_counts(products),
     }
+
+
+def _type_counts(products: list[dict]) -> list[dict]:
+    """Types present in the result with product counts, most common first."""
+    n: dict[str, int] = {}
+    for p in products:
+        for t in p["types"]:
+            n[t] = n.get(t, 0) + 1
+    return [{"name": k, "count": v} for k, v in sorted(n.items(), key=lambda kv: (-kv[1], kv[0]))]
