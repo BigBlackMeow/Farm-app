@@ -1,0 +1,15 @@
+[Unit]
+Description=Farm App (webová aplikace)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=farmapp
+WorkingDirectory=/opt/farm-app
+# Jen pro tento server; ven ji pustí Cloudflare Tunnel (HTTPS).
+ExecStart=/opt/farm-app/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Farm App: stažení aktuálního registru přípravků
+
+[Service]
+Type=oneshot
+User=farmapp
+WorkingDirectory=/opt/farm-app
+ExecStart=/opt/farm-app/.venv/bin/python -m app.registry_import
+# Aplikace si registr drží otevřený, po stažení ji restartujeme (root).
+ExecStartPost=+/bin/systemctl restart farm-app.service

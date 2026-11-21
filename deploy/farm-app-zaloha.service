@@ -1,0 +1,9 @@
+[Unit]
+Description=Farm App: záloha účtů, skladu a evidence
+
+[Service]
+Type=oneshot
+User=farmapp
+WorkingDirectory=/opt/farm-app
+# Bezpečná kopie databáze i za běhu; nechává posledních 30 záloh.
+ExecStart=/bin/sh -c 'sqlite3 data/users.sqlite ".backup zalohy/users-$(date +%%F).sqlite" && { [ ! -f data/nastaveni.json ] || cp data/nastaveni.json zalohy/nastaveni.json; } && ls -1t zalohy/users-*.sqlite | tail -n +31 | xargs -r rm --'
