@@ -193,6 +193,20 @@
   @media (max-width: 520px) { .kinds { gap:6px; } .kinds .option { padding:10px 8px; text-align:center; } .kinds .option b { font-size:14px; } .kinds .option span { display:none; } }
   .notice { border-radius:12px; padding:12px 14px; font-size:14px; margin-top:14px; }
   .notice.ok { background:var(--ok-bg); color:var(--ok); } .notice.warn { background:var(--warn-bg); color:var(--warn); }
+  .btn.danger { background:var(--block); } .btn.danger:hover { background:#8c1d17; } .btn.danger:disabled { background:var(--block); }
+  .btn.ghost.danger { background:transparent; color:var(--block); border-color:#e8b4ae; } .btn.ghost.danger:hover { background:var(--block-bg); }
+  .notice.bad { background:var(--block-bg); color:var(--block); }
+  .account-grid { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:16px; align-items:start; }
+  .account-grid .wide { grid-column:1 / -1; }
+  @media (max-width: 860px) { .account-grid { grid-template-columns:minmax(0, 1fr); } }
+  @media (max-width: 640px) { .ulist .opt { display:none; } .ulist td.act { white-space:normal; } }
+  .card.dangerzone { border:1px solid #efc9c4; }
+  .acc-row { display:flex; gap:10px; align-items:end; } .acc-row > div { flex:1; min-width:0; }
+  .ulist td, .ulist th { padding:8px 6px; text-align:left; border-bottom:1px solid var(--line); vertical-align:middle; }
+  .ulist td.act { white-space:nowrap; text-align:right; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); margin-left:6px; }
+  .user-btn { border:0; background:transparent; font:inherit; color:var(--muted); cursor:pointer; padding:6px 8px; border-radius:999px; }
+  .user-btn:hover { background:var(--accent-soft); color:var(--accent); }
   .smsg { border-bottom:1px solid var(--line); padding:10px 0; } .smsg:last-child { border-bottom:0; }
   .smsg .top { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
   .smsg .st { font-size:12px; font-weight:600; white-space:nowrap; } .st.sent { color:var(--ok); } .st.wait { color:var(--warn); }
@@ -245,9 +259,10 @@
         <button id="navStock">Můj sklad <span id="stockCount"></span></button>
         <button id="navRecords">Evidence</button>
         <button id="navSupport">Podpora</button>
+        <button id="navAccount">Můj účet</button>
       </nav>
       <div class="spacer"></div>
-      <span class="user" id="userName"></span>
+      <button class="user user-btn" id="userName" type="button" title="Můj účet"></button>
       <button class="btn ghost small" id="logout">Odhlásit</button>
     </div>
     <div class="banner" id="regBanner" hidden></div>
@@ -429,6 +444,50 @@
   </main>
 
   <!-- support: bug report / feature request / question -->
+  <main class="page" id="account" hidden>
+    <div class="page-head"><h2>Můj účet</h2><p>Přihlašovací údaje, heslo a smazání účtu.</p></div>
+    <div class="account-grid">
+      <div class="card">
+        <h3 style="margin-top:0">Přihlášení</h3>
+        <label>E-mail (slouží k přihlášení)</label><input id="accEmail" disabled>
+        <div class="acc-row">
+          <div><label for="accName">Jméno</label><input id="accName" maxlength="80" autocomplete="name"></div>
+          <button class="btn ghost" id="accNameSave" type="button">Uložit</button>
+        </div>
+        <div id="accNameMsg" class="error"></div>
+        <p class="muted" id="accSessions" style="margin:14px 0 8px"></p>
+        <button class="btn ghost" id="accLogoutAll" type="button">Odhlásit na ostatních zařízeních</button>
+        <div id="accLogoutMsg"></div>
+      </div>
+      <form class="card" id="accPw" novalidate>
+        <h3 style="margin-top:0">Změnit heslo</h3>
+        <input type="email" autocomplete="username" id="accPwUser" hidden>
+        <label for="accPwCur">Současné heslo</label><input id="accPwCur" type="password" autocomplete="current-password">
+        <label for="accPwNew">Nové heslo (aspoň 8 znaků)</label><input id="accPwNew" type="password" autocomplete="new-password">
+        <label for="accPwNew2">Nové heslo znovu</label><input id="accPwNew2" type="password" autocomplete="new-password">
+        <button class="btn block" type="submit" style="margin-top:14px">Změnit heslo</button>
+        <p class="muted" style="margin:8px 0 0;font-size:13px">Na ostatních zařízeních se po změně hesla budete muset přihlásit znovu.</p>
+        <div id="accPwMsg" class="error"></div>
+      </form>
+      <div class="card wide" id="admin" hidden>
+        <h3 style="margin-top:0">Uživatelé aplikace <span class="tag">správce</span></h3>
+        <p class="muted" style="margin:0">Smazáním účtu zmizí i všechna data uživatele: sklad, pole, evidence postřiků a zprávy podpory. Nejde to vrátit.</p>
+        <div class="table-wrap"><table class="ulist"><thead><tr><th>Jméno a e-mail</th><th class="opt">Registrace</th><th>Naposledy přihlášen</th><th class="opt">Přihlášená zařízení</th><th></th></tr></thead><tbody id="adminUsers"></tbody></table></div>
+        <div id="adminMsg" class="error"></div>
+      </div>
+      <form class="card wide dangerzone" id="accDel" novalidate>
+        <h3 style="margin-top:0;color:var(--block)">Smazat účet</h3>
+        <p class="muted" style="margin:0">Smaže se váš účet a všechno, co jste v aplikaci uložili: přihlašovací údaje, sklad, pole, evidence postřiků a zprávy podpory. Nejde to vrátit. Evidenci si předtím můžete stáhnout v části Evidence (CSV nebo tisk).</p>
+        <div class="acc-row" style="flex-wrap:wrap">
+          <div style="min-width:220px"><label for="accDelPw">Pro potvrzení zadejte heslo</label><input id="accDelPw" type="password" autocomplete="current-password"></div>
+          <button class="btn danger" id="accDelBtn" type="submit">Smazat můj účet</button>
+        </div>
+        <label class="check"><input type="checkbox" id="accDelOk"> Rozumím, že se smaže všechno a nepůjde to vrátit.</label>
+        <div id="accDelMsg" class="error"></div>
+      </form>
+    </div>
+  </main>
+
   <main class="page" id="support" hidden>
     <div class="page-head"><h2>Podpora</h2><p>Našli jste chybu, chybí vám nějaká funkce, nebo něčemu nerozumíte? Napište nám.</p></div>
     <div class="support-grid">
@@ -573,6 +632,12 @@ function updateBar() {
     $("#next").textContent = "Odeslat zprávu"; $("#next").disabled = sending;
     return;
   }
+  if (view === "account") {
+    $("#back").hidden = true;
+    $("#sum").innerHTML = `Přihlášen: <b>${esc(me ? me.email : "")}</b>`;
+    $("#next").textContent = "Zpět k vyhodnocení"; $("#next").disabled = false;
+    return;
+  }
   $("#back").textContent = "Zpět";
   if (view === "stock") { $("#sum").innerHTML = `<b>${stock.length}</b> přípravků na skladě`; }
   else $("#sum").innerHTML = parts.join(" · ") || "Vyberte pozemek v mapě";
@@ -589,7 +654,7 @@ function updateBar() {
 $("#back").onclick = () => view === "support" ? goStep(step) : view === "form" ? showRecords() : view === "stock" ? goStep(step) : goStep(step - 1);
 $("#next").onclick = () => {
   if (view === "support") return sendSupport();
-  if (view === "stock") return goStep(step);
+  if (view === "stock" || view === "account") return goStep(step);
   if (view === "records") { rfContext = null; return openRecordForm({}, null); }
   if (view === "form") return saveRecord();
   if (step === 1) return goStep(2);
@@ -999,7 +1064,7 @@ const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOff
 
 function hidePages() {
   [1, 2, 3].forEach(i => $("#step" + i).hidden = true);
-  ["#stock", "#records", "#recordForm", "#support"].forEach(s => $(s).hidden = true);
+  ["#stock", "#records", "#recordForm", "#support", "#account"].forEach(s => $(s).hidden = true);
   $("#stepper").hidden = true;
   $$(".topnav button").forEach(b => b.classList.remove("active"));
 }
@@ -1258,7 +1323,7 @@ async function showSupport() {
   $("#navSupport").classList.add("active"); $("#support").hidden = false;
   if (!$("#sf_contact").value && me) $("#sf_contact").value = me.email;
   $("#sfErr").textContent = "";
-  $("#sfSetup").hidden = !!appMeta.support_ready;
+  $("#sfSetup").hidden = !!appMeta.support_ready || !me.is_admin;
   setKind(sfKind); updateBar(); window.scrollTo(0, 0);
   loadSupport();
 }
@@ -1333,6 +1398,94 @@ async function sendSupport() {
     loadSupport();
   } catch (err) { $("#sfErr").textContent = err.message; }
   sending = false; updateBar();
+}
+
+/* ---------------- my account ---------------- */
+const czTime = v => v ? new Date(v).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
+const devices = n => n === 1 ? "1 zařízení" : `${n} zařízeních`;
+async function showAccount() {
+  view = "account"; hidePages();
+  $("#navAccount").classList.add("active"); $("#account").hidden = false;
+  ["#accNameMsg", "#accPwMsg", "#accDelMsg", "#adminMsg"].forEach(s => $(s).textContent = "");
+  $("#accLogoutMsg").innerHTML = "";
+  $("#accEmail").value = me.email; $("#accPwUser").value = me.email; $("#accName").value = me.name || "";
+  $("#accDelPw").value = ""; $("#accDelOk").checked = false;
+  updateBar(); window.scrollTo(0, 0);
+  try {
+    const a = await api("/api/account");
+    Object.assign(me, a);
+    $("#accSessions").textContent = `Teď jste přihlášeni na ${devices(a.sessions)} (včetně tohoto).`;
+    $("#accLogoutAll").hidden = a.sessions < 2;
+  } catch (err) { return; }
+  $("#admin").hidden = !me.is_admin;
+  if (me.is_admin) loadAdminUsers();
+}
+$("#navAccount").onclick = showAccount;
+$("#userName").onclick = showAccount;
+
+$("#accNameSave").onclick = async () => {
+  $("#accNameMsg").textContent = "";
+  try {
+    me = { ...me, ...(await api("/api/account/name", { method: "PUT", body: JSON.stringify({ name: $("#accName").value }) })) };
+    $("#userName").textContent = me.name || me.email;
+    $("#accNameMsg").innerHTML = '<span style="color:var(--ok)">Uloženo.</span>';
+  } catch (err) { $("#accNameMsg").textContent = err.message; }
+};
+$("#accLogoutAll").onclick = async () => {
+  try {
+    const r = await api("/api/account/logout-everywhere", { method: "POST" });
+    $("#accLogoutMsg").innerHTML = `<div class="notice ok">Hotovo, odhlášeno na ${devices(r.ended)}. Tady zůstáváte přihlášeni.</div>`;
+    $("#accSessions").textContent = "Teď jste přihlášeni jen na tomto zařízení."; $("#accLogoutAll").hidden = true;
+  } catch (err) { $("#accLogoutMsg").innerHTML = `<div class="error">${esc(err.message)}</div>`; }
+};
+$("#accPw").onsubmit = async e => {
+  e.preventDefault();
+  const m = $("#accPwMsg"); m.textContent = "";
+  if ($("#accPwNew").value !== $("#accPwNew2").value) { m.textContent = "Nová hesla se neshodují."; return; }
+  try {
+    await api("/api/account/password", { method: "POST", body: JSON.stringify({ current: $("#accPwCur").value, new: $("#accPwNew").value }) });
+    ["#accPwCur", "#accPwNew", "#accPwNew2"].forEach(s => $(s).value = "");
+    m.innerHTML = '<span style="color:var(--ok)">Heslo je změněné.</span>';
+    $("#accSessions").textContent = "Teď jste přihlášeni jen na tomto zařízení."; $("#accLogoutAll").hidden = true;
+  } catch (err) { m.textContent = err.message; }
+};
+$("#accDel").onsubmit = async e => {
+  e.preventDefault();
+  const m = $("#accDelMsg"); m.textContent = "";
+  if (!$("#accDelOk").checked) { m.textContent = "Zaškrtněte, že rozumíte, co se smaže."; return; }
+  if (!$("#accDelPw").value) { m.textContent = "Zadejte heslo."; return; }
+  $("#accDelBtn").disabled = true;
+  try {
+    await api("/api/account/delete", { method: "POST", body: JSON.stringify({ password: $("#accDelPw").value }) });
+    location.reload();
+  } catch (err) { m.textContent = err.message; }
+  $("#accDelBtn").disabled = false;
+};
+
+let adminList = [], adminConfirm = null;
+async function loadAdminUsers() {
+  try { adminList = await api("/api/admin/users"); } catch (err) { $("#adminMsg").textContent = err.message; return; }
+  renderAdminUsers();
+}
+function renderAdminUsers() {
+  $("#adminUsers").innerHTML = adminList.map(u => {
+    const self = u.id === me.id;
+    const confirm = adminConfirm === u.id;
+    const actions = self ? '<span class="muted">to jste vy</span>'
+      : confirm ? `<span class="muted">Opravdu smazat?</span> <button class="btn danger small" data-del="${u.id}">Ano, smazat</button> <button class="btn ghost small" data-cancel>Ne</button>`
+      : `${u.sessions ? `<button class="btn ghost small" data-out="${u.id}">Odhlásit</button> ` : ""}<button class="btn ghost danger small" data-ask="${u.id}">Smazat</button>`;
+    return `<tr><td><b>${esc(u.name || "–")}</b>${u.is_admin ? '<span class="tag">správce</span>' : ""}<br><span class="muted">${esc(u.email)}</span></td>
+      <td class="opt">${esc(czTime(u.created_at))}</td><td>${esc(czTime(u.last_login_at))}</td><td class="opt">${u.sessions}</td><td class="act">${actions}</td></tr>`;
+  }).join("");
+  $$("#adminUsers [data-ask]").forEach(b => b.onclick = () => { adminConfirm = +b.dataset.ask; renderAdminUsers(); });
+  $$("#adminUsers [data-cancel]").forEach(b => b.onclick = () => { adminConfirm = null; renderAdminUsers(); });
+  $$("#adminUsers [data-del]").forEach(b => b.onclick = () => adminAction(`/api/admin/users/${b.dataset.del}`, "DELETE"));
+  $$("#adminUsers [data-out]").forEach(b => b.onclick = () => adminAction(`/api/admin/users/${b.dataset.out}/logout`, "POST"));
+}
+async function adminAction(path, method) {
+  $("#adminMsg").textContent = ""; adminConfirm = null;
+  try { adminList = await api(path, { method }); } catch (err) { $("#adminMsg").textContent = err.message; }
+  renderAdminUsers();
 }
 
 function applyAppName(m) {
