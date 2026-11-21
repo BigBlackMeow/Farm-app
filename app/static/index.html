@@ -156,6 +156,14 @@
   .plist { list-style:none; padding:0; margin:10px 0 0; }
   .plist li { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
   .plist li:last-child { border-bottom:0; }
+  .plist li.stock-item { flex-wrap:wrap; }
+  .price-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .price-row input { width:110px; padding:7px 10px; } .price-row select { width:auto; padding:7px 8px; }
+  .price-row .saved { font-size:12px; color:var(--ok); }
+  .cost { white-space:nowrap; } .cost .muted { white-space:normal; }
+  .price-box { background:var(--bg); border-radius:10px; padding:10px 12px; margin-top:10px; }
+  .price-box label { margin-top:0; }
+  .rec-sum { margin:0 0 12px; font-size:15px; }
 
   /* spray records */
   .rec-toolbar { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px; }
@@ -334,7 +342,7 @@
 
   <!-- stock page -->
   <main class="page" id="stock" hidden>
-    <div class="page-head"><h2>Můj sklad</h2><p>Přípravky, které máte nakoupené. Ve výsledku se zobrazí jako první.</p></div>
+    <div class="page-head"><h2>Můj sklad</h2><p>Přípravky, které máte nakoupené. Ve výsledku se zobrazí jako první. Když zadáte nákupní cenu, ukáže vám vyhodnocení, kolik postřik stojí na hektar a na celý díl.</p></div>
     <div class="stock-grid">
       <div class="card">
         <h3>Přidat přípravek</h3>
@@ -398,6 +406,8 @@
           <div><label class="req" for="rf_dose">Dávka na jednotku</label><div class="dose-row"><input id="rf_dose" inputmode="decimal" placeholder="0,8"><select id="rf_dose_unit"></select></div><div class="hint" id="rfDoseHint"></div></div>
           <div><label class="req" for="rf_treated_area_ha">Ošetřená výměra (ha)</label><input id="rf_treated_area_ha" inputmode="decimal"></div>
           <div><label for="rfTotal">Celkové množství přípravku</label><input id="rfTotal" disabled></div>
+          <div><label for="rf_price" id="rfPriceLabel">Cena přípravku (Kč za l)</label><input id="rf_price" inputmode="decimal" placeholder="nepovinné"><div class="hint">Doplní se z Mého skladu. Do záznamu pro kontrolu se netiskne.</div></div>
+          <div><label for="rfCost">Náklady na přípravek</label><input id="rfCost" disabled></div>
           <div class="span2"><label class="req" for="rf_target">Škodlivý organismus nebo účel (jak je na etiketě)</label><input id="rf_target" list="rfTargets"><datalist id="rfTargets"></datalist></div>
           <div><label for="rf_tank_mix">Samostatně, nebo ve směsi</label><select id="rf_tank_mix"><option value="S">S: samostatně</option><option value="TM">TM: ve směsi</option></select></div>
           <div class="span3" id="mixRow" hidden><label for="rf_mix_with">Ve směsi s (přípravky, hnojiva)</label><input id="rf_mix_with"></div>
@@ -862,10 +872,17 @@ function renderResults() {
         </summary>
         ${p.checks.length ? `<ul class="checks">${p.checks.map(c => `<li class="${c.level}">${esc(c.text)}</li>`).join("")}</ul>` : ""}
         <div class="table-wrap"><table>
-          <tr><th>Škodlivý organismus</th><th>Dávka</th><th>OL (dny)</th><th>BBCH</th><th>Max.</th></tr>
-          ${p.uses.map(u => `<tr><td>${esc(u.target)}<div class="muted">${esc(u.crop)}</div></td><td>${esc(u.dose)}</td><td>${esc(u.phi)}</td>
+          <tr><th>Škodlivý organismus</th><th>Dávka</th>${p.price ? "<th>Náklady</th>" : ""}<th>OL (dny)</th><th>BBCH</th><th>Max.</th></tr>
+          ${p.uses.map(u => `<tr><td>${esc(u.target)}<div class="muted">${esc(u.crop)}</div></td><td>${esc(u.dose)}</td>${p.price ? `<td class="cost">${costCell(u.cost)}</td>` : ""}<td>${esc(u.phi)}</td>
             <td>${u.bbch_from ?? ""}${u.bbch_to != null && u.bbch_to !== u.bbch_from ? "–" + u.bbch_to : ""}</td><td>${u.max_applications ? u.max_applications + "×" : ""}</td></tr>`).join("")}
         </table></div>
+        <div class="price-box price-row">
+          <label for="pp_${esc(p.decision_id)}" style="margin:0">Vaše nákupní cena</label>
+          <input id="pp_${esc(p.decision_id)}" data-pprice="${esc(p.product)}" inputmode="decimal" placeholder="např. 1250" value="${p.price ? czNum(p.price) : ""}">
+          <select data-punit="${esc(p.product)}">${["l", "kg"].map(x => `<option value="${x}" ${(p.price_unit || guessUnit(p)) === x ? "selected" : ""}>Kč za ${x}</option>`).join("")}</select>
+          <button class="btn ghost small" data-psave="${esc(p.product)}">Uložit cenu</button>
+          <span class="muted">${p.price ? "" : p.owned ? "Zadejte cenu a uvidíte náklady na hektar i na celý díl." : "Uložením ceny se přípravek přidá do skladu."}</span>
+        </div>
         <div class="pfoot">
           <span class="muted">Povolení do ${esc(p.authorized_until)}, použitelné do ${esc(p.usable_until)}.
             ${p.documents.map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">Další informace (PDF)</a>`).join(" · ")}</span>
@@ -886,9 +903,31 @@ function renderResults() {
     renderResults();
     if (open) { const el = [...$$("#results [data-own]")].find(x => x.dataset.own === name); el && (el.closest("details").open = true); }
   });
+  $$("#results [data-psave]").forEach(b => b.onclick = async () => {
+    const name = b.dataset.psave, box = b.closest(".price-box");
+    const price = box.querySelector("[data-pprice]").value, unit = box.querySelector("[data-punit]").value;
+    b.disabled = true;
+    try {
+      stock = await api("/api/my-products/price", { method: "PUT", body: JSON.stringify({ product: name, price, unit }) });
+      renderStock();
+      lastResult = await api("/api/evaluate?" + new URLSearchParams({ field_id: fieldId, crop, nozzle }));
+      renderResults();
+      const el = [...$$("#results [data-psave]")].find(x => x.dataset.psave === name); el && (el.closest("details").open = true);
+    } catch (err) { b.disabled = false; alert(err.message); }
+  });
   $$("#results [data-record]").forEach(b => b.onclick = () => recordFromResult(lastResult.products.find(x => x.product === b.dataset.record)));
   const inp = $("#filter");
   inp.oninput = () => { const pos = inp.selectionStart; resultFilter = inp.value; renderResults(); const n = $("#filter"); n.focus(); n.setSelectionRange(pos, pos); };
+}
+
+function costCell(c) {
+  if (!c) return "";
+  if (c.error) return `<span class="muted">nelze spočítat (${esc(c.error)})</span>`;
+  return `<b>${kcRange(c.min, c.max)}</b>/ha${c.field_min != null ? `<div class="muted">celý díl ${czNum(lastResult.area_ha)} ha: ${kcRange(c.field_min, c.field_max)}</div>` : ""}`;
+}
+function guessUnit(p) {
+  const u = (p.uses || []).map(x => x.dose_unit || (parseDose(x.dose) || {}).unit || "").find(Boolean) || "";
+  return /^(g|kg)/i.test(u) ? "kg" : "l";
 }
 
 /* ---------------- my stock ---------------- */
@@ -898,10 +937,25 @@ function renderStock() {
   $("#stockNote").textContent = stock.length
     ? `Máte ${stock.length} přípravků. Ve výsledku je uvidíte jako první.`
     : "Zatím prázdný. Přidejte si nakoupené přípravky a ve výsledku je uvidíte jako první.";
-  $("#plist").innerHTML = stock.map(p => `<li><span><b>${esc(p.product)}</b><br><span class="muted">${esc(p.function)}${p.active_substances.length ? " · " + p.active_substances.map(esc).join(", ") : ""}${p.known ? "" : "není v registru"}</span></span>
-    <button class="btn ghost small" data-rm="${esc(p.product)}">Odebrat</button></li>`).join("") || '<li class="muted">Zatím nic. Vyhledejte přípravek vlevo.</li>';
+  $("#plist").innerHTML = stock.map(p => `<li class="stock-item"><span><b>${esc(p.product)}</b><br><span class="muted">${esc(p.function)}${p.active_substances.length ? " · " + p.active_substances.map(esc).join(", ") : ""}${p.known ? "" : "není v registru"}</span></span>
+    <span class="price-row">
+      <input data-sprice="${esc(p.product)}" inputmode="decimal" placeholder="cena" value="${p.price ? czNum(p.price) : ""}" aria-label="Nákupní cena ${esc(p.product)}">
+      <select data-sunit="${esc(p.product)}" aria-label="Jednotka ceny">${["l", "kg"].map(x => `<option value="${x}" ${(p.price_unit || "l") === x ? "selected" : ""}>Kč za ${x}</option>`).join("")}</select>
+      <span class="saved" data-ssaved="${esc(p.product)}"></span>
+      <button class="btn ghost small" data-rm="${esc(p.product)}">Odebrat</button>
+    </span></li>`).join("") || '<li class="muted">Zatím nic. Vyhledejte přípravek vlevo.</li>';
   $$("#plist [data-rm]").forEach(b => b.onclick = async () => { await removeStock(b.dataset.rm); searchProducts(); });
+  $$("#plist [data-sprice], #plist [data-sunit]").forEach(el => el.onchange = () => saveStockPrice(el.dataset.sprice || el.dataset.sunit));
   updateBar();
+}
+async function saveStockPrice(product) {
+  const price = [...$$("#plist [data-sprice]")].find(x => x.dataset.sprice === product).value;
+  const unit = [...$$("#plist [data-sunit]")].find(x => x.dataset.sunit === product).value;
+  const mark = t => { const s = [...$$("#plist [data-ssaved]")].find(x => x.dataset.ssaved === product); if (s) s.textContent = t; };
+  try {
+    stock = await api("/api/my-products/price", { method: "PUT", body: JSON.stringify({ product, price, unit }) });
+    renderStock(); mark(price ? "uloženo" : "cena smazána");
+  } catch (err) { mark(""); alert(err.message); }
 }
 async function loadStock() {
   try { stock = await api("/api/my-products"); } catch (err) { stock = []; }
@@ -934,7 +988,11 @@ $("#pq").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeou
 let recs = [], recProfile = {}, recUnits = [], editingId = null, rfContext = null;
 const RF = ["app_date", "app_time", "square", "field_code", "parcel", "cadastral", "crop", "crop_area_ha", "sowing_date",
   "crop_end_date", "treated_area_ha", "product", "reg_number", "dose", "dose_unit", "target", "tank_mix", "mix_with",
-  "bbch", "efficacy", "water_l_ha", "nozzle", "applicator", "sprayer", "note"];
+  "bbch", "efficacy", "water_l_ha", "nozzle", "applicator", "sprayer", "note", "price"];
+const kc = v => v == null || v === "" ? "" : Math.round(v).toLocaleString("cs-CZ") + " Kč";
+const kcRange = (a, b) => a === b ? kc(a) : `${Math.round(a).toLocaleString("cs-CZ")}–${kc(b)}`;
+const priceUnitOf = doseUnit => /^(ml|l)\/ha$/.test(doseUnit) ? "l" : /^(g|kg)\/ha$/.test(doseUnit) ? "kg" : "";
+const toNum = v => parseFloat(String(v ?? "").replace(/\s/g, "").replace(",", "."));
 const czDate = v => v ? new Date(v + "T00:00:00").toLocaleDateString("cs-CZ") : "";
 const czNum = v => v == null || v === "" ? "" : String(v).replace(".", ",");
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
@@ -1017,7 +1075,9 @@ function renderRecords() {
       Záznam nejsnáz vytvoříte z vyhodnocení: u přípravku klikněte na <b>Zapsat postřik</b>. Nebo použijte tlačítko <b>Nový záznam</b> dole.</p></div>`;
     return;
   }
-  $("#recList").innerHTML = recs.map(r => {
+  const priced = recs.filter(r => r.cost != null), sum = priced.reduce((a, r) => a + r.cost, 0);
+  $("#recList").innerHTML = (priced.length ? `<p class="rec-sum">Náklady na přípravky v tomto období: <b>${kc(sum)}</b>
+    <span class="muted">(${priced.length} z ${recs.length} záznamů má zadanou cenu)</span></p>` : "") + recs.map(r => {
     const place = r.square ? `díl ${esc(r.field_code)} (${esc(r.square)})` : `parcela ${esc(r.parcel)}`;
     const todo = r.missing.filter(m => m !== "údaje o podniku");
     return `<div class="rec">
@@ -1028,6 +1088,7 @@ function renderRecords() {
       <dl class="facts">
         <dt>Přípravek</dt><dd><b>${esc(r.product)}</b>${r.reg_number ? ` <span class="muted">ev. č. ${esc(r.reg_number)}</span>` : ""}</dd>
         <dt>Dávka</dt><dd>${czNum(r.dose)} ${esc(r.dose_unit)} na ${czNum(r.treated_area_ha)} ha${r.total_amount ? ` = <b>${esc(r.total_amount)}</b>` : ""}</dd>
+        ${r.cost != null ? `<dt>Náklady</dt><dd>${kc(r.cost)} <span class="muted">(${czNum(r.price)} Kč/${esc(r.price_unit)}, ${kc(r.cost / r.treated_area_ha)}/ha)</span></dd>` : ""}
         <dt>Proti</dt><dd>${esc(r.target)}</dd>
         ${r.bbch ? `<dt>BBCH</dt><dd>${esc(r.bbch)}</dd>` : ""}
       </dl>
@@ -1069,7 +1130,7 @@ function fillForm(r) {
   $("#rf_tank_mix").value = r.tank_mix || "S";
   $("#rf_nozzle").value = r.nozzle == null ? "" : String(r.nozzle);
   $("#mixRow").hidden = $("#rf_tank_mix").value !== "TM";
-  updateTotal();
+  updateTotal(); updateCost();
 }
 
 function openRecordForm(r, id) {
@@ -1093,6 +1154,7 @@ async function recordFromResult(p) {
     crop_area_ha: field.area_ha, treated_area_ha: field.area_ha, product: p.product,
     reg_number: p.reg_number, dose: dose.dose || "", dose_unit: dose.unit || "l/ha",
     target: p.uses.length === 1 ? p.uses[0].target : "", nozzle: lastResult.nozzle, tank_mix: "S",
+    price: p.price && p.price_unit === priceUnitOf(dose.unit || "l/ha") ? p.price : "",
   };
   try { Object.assign(r, Object.fromEntries(Object.entries(await api("/api/records/prefill?" +
     new URLSearchParams({ square: field.square, code: field.short_code, crop: lastResult.crop }))).filter(([, v]) => v !== "" && v != null))); }
@@ -1114,7 +1176,23 @@ function updateTotal() {
   if (base === "g" && total >= 1000) { total /= 1000; base = "kg"; }
   $("#rfTotal").value = `${czNum(Math.round(total * 1000) / 1000)} ${base}`;
 }
+function updateCost() {
+  const unit = $("#rf_dose_unit").value, pu = priceUnitOf(unit);
+  $("#rfPriceLabel").textContent = `Cena přípravku (Kč za ${pu || "l nebo kg"})`;
+  const dose = toNum($("#rf_dose").value), area = toNum($("#rf_treated_area_ha").value), price = toNum($("#rf_price").value);
+  if (!(dose > 0 && area > 0 && price > 0) || !pu) { $("#rfCost").value = ""; return; }
+  const total = dose * (/^(ml|g)\//.test(unit) ? 0.001 : 1) * area * price;
+  $("#rfCost").value = `${kc(total)} (${kc(total / area)}/ha)`;
+}
+function priceFromStock() {
+  if ($("#rf_price").value.trim()) return;
+  const s = stock.find(x => x.product === $("#rf_product").value.trim());
+  if (s && s.price && s.price_unit === priceUnitOf($("#rf_dose_unit").value)) { $("#rf_price").value = czNum(s.price); updateCost(); }
+}
 ["#rf_dose", "#rf_treated_area_ha", "#rf_dose_unit"].forEach(s => $(s).addEventListener("input", updateTotal));
+["#rf_dose", "#rf_treated_area_ha", "#rf_dose_unit", "#rf_price"].forEach(s => $(s).addEventListener("input", updateCost));
+$("#rf_dose_unit").addEventListener("change", () => { updateCost(); priceFromStock(); });
+$("#rf_product").addEventListener("change", priceFromStock);
 $("#rf_tank_mix").onchange = () => { $("#mixRow").hidden = $("#rf_tank_mix").value !== "TM"; };
 let rfTimer;
 $("#rf_product").addEventListener("input", () => {

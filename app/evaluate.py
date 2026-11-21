@@ -14,6 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from . import lpis
+from . import prices
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "registry.sqlite"
 NOZZLE_COL = {0: "no_reduction", 50: "nozzle50", 75: "nozzle75", 90: "nozzle90"}
@@ -200,8 +201,10 @@ def _merge_by_product(decisions: list[dict], order: dict) -> list[dict]:
 
 
 def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | None = None,
-             owned: set[str] | None = None) -> dict:
-    """`owned`: product names the user has in stock; these are marked and listed first."""
+             owned: dict | set | None = None, area_ha: float | None = None) -> dict:
+    """`owned`: products the user has in stock ({name: {"price", "price_unit"}} or a set of names);
+    these are marked and listed first. With a price, each use gets its cost per hectare and,
+    with `area_ha`, for the whole field."""
     today = today or date.today()
     iso = today.isoformat()
     row = con.execute("SELECT codes FROM crops WHERE name=?", (crop,)).fetchone()
@@ -278,6 +281,7 @@ def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | Non
                 "crop": u["crop_text"], "target": u["target"], "dose": u["dose_text"], "phi": u["phi"],
                 "bbch_from": u["bbch_from"], "bbch_to": u["bbch_to"],
                 "max_applications": u["max_applications"], "note": u["note"],
+                "dose_min": u["dose_min"], "dose_max": u["dose_max"], "dose_unit": u["dose_unit"],
             } for u in dec_uses],
             "documents": [x for x in json.loads(d["documents"]) if x["type"].startswith("Další informace")],
         })
@@ -287,6 +291,14 @@ def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | Non
     owned = owned or set()
     for p in products:
         p["owned"] = p["product"] in owned
+        info = owned.get(p["product"]) if isinstance(owned, dict) else None
+        p["price"] = info["price"] if info else None
+        p["price_unit"] = info["price_unit"] if info else ""
+        for u in p["uses"]:
+            c = prices.use_cost(u, p["price"], p["price_unit"])
+            if c and "min" in c and area_ha:
+                c["field_min"], c["field_max"] = round(c["min"] * area_ha), round(c["max"] * area_ha)
+            u["cost"] = c
     products.sort(key=lambda p: (not p["owned"], order[p["level"]], p["product"].lower()))
     return {
         "crop": crop,
@@ -294,6 +306,7 @@ def evaluate(con, field_ctx: dict, crop: str, nozzle: int = 0, today: date | Non
         "date": iso,
         "registry_date": registry_date(con),
         "counts": {k: sum(1 for p in products if p["level"] == k) for k in order},
+        "area_ha": area_ha,
         "owned_counts": {k: sum(1 for p in products if p["level"] == k and p["owned"]) for k in order},
         "products": products,
     }

@@ -14,6 +14,7 @@ import re
 from datetime import date, datetime, timezone
 
 from .config import APP_NAME
+from .prices import price_unit_for, record_cost
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS farm_profile (
@@ -61,7 +62,7 @@ DOSE_UNITS = ["l/ha", "ml/ha", "kg/ha", "g/ha", "l/t", "ml/t", "kg/t", "g/t", "l
 TEXT_FIELDS = ["app_date", "app_time", "square", "field_code", "parcel", "cadastral", "crop", "sowing_date",
                "crop_end_date", "product", "reg_number", "dose_unit", "target", "tank_mix", "mix_with", "bbch",
                "efficacy", "applicator", "sprayer", "note"]
-NUM_FIELDS = ["crop_area_ha", "treated_area_ha", "dose", "water_l_ha", "nozzle"]
+NUM_FIELDS = ["crop_area_ha", "treated_area_ha", "dose", "water_l_ha", "nozzle", "price"]
 FIELDS = TEXT_FIELDS + NUM_FIELDS
 PROFILE_FIELDS = ["name", "ico", "birth_date", "address"]
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -130,6 +131,8 @@ def clean(data: dict) -> dict:
     r["crop_area_ha"] = round(crop_area, 2) if crop_area is not None else None
     r["dose"] = round(_number(data.get("dose"), "dávku", required=True), 3)
     r["water_l_ha"] = _number(data.get("water_l_ha"), "množství vody")
+    price = _number(data.get("price"), "cenu přípravku")
+    r["price"] = round(price, 2) if price is not None else None
     nozzle = data.get("nozzle")
     r["nozzle"] = int(nozzle) if str(nozzle) in ("0", "50", "75", "90") else None
     return r
@@ -184,6 +187,9 @@ class Records:
         self.store = store
         with store.lock:
             store.con.executescript(SCHEMA)
+            cols = {r[1] for r in store.con.execute("PRAGMA table_info(spray_records)")}
+            if "price" not in cols:  # Kč per l or kg of the product; added after the first version
+                store.con.execute("ALTER TABLE spray_records ADD COLUMN price REAL")
 
     def _exec(self, sql: str, args: tuple = ()):
         return self.store._exec(sql, args)
@@ -222,6 +228,8 @@ class Records:
         out = self._rows(where, tuple(args))
         for r in out:
             r["total_amount"] = total_amount(r)
+            r["price_unit"] = price_unit_for(r["dose_unit"])
+            r["cost"] = record_cost(r["dose"], r["dose_unit"], r["treated_area_ha"], r["price"])
             r["missing"] = missing(r, profile)
         return out
 
@@ -293,6 +301,8 @@ CSV_COLUMNS = [
     ("Aplikoval", lambda r: r["applicator"]),
     ("Postřikovač", lambda r: r["sprayer"]),
     ("Poznámka", lambda r: r["note"]),
+    ("Cena přípravku (Kč za l nebo kg)", lambda r: cz(r["price"])),
+    ("Náklady na přípravek (Kč)", lambda r: cz(record_cost(r["dose"], r["dose_unit"], r["treated_area_ha"], r["price"]))),
 ]
 
 

@@ -1,4 +1,5 @@
-"""User accounts, login sessions and each user's list of purchased products ("můj sklad").
+"""User accounts, login sessions and each user's list of purchased products ("můj sklad")
+with the purchase price they entered.
 
 Stored in the SQLite file data/users.sqlite. Passwords are hashed with scrypt (Python standard library); the login cookie holds a random token.
 """
@@ -54,6 +55,10 @@ class Store:
         self.con = sqlite3.connect(sqlite_path, check_same_thread=False, isolation_level=None)
         self.con.execute("PRAGMA foreign_keys=ON")
         self.con.executescript(SCHEMA)
+        cols = {r[1] for r in self.con.execute("PRAGMA table_info(user_products)")}
+        if "price" not in cols:  # databases created before prices existed
+            self.con.execute("ALTER TABLE user_products ADD COLUMN price REAL")
+            self.con.execute("ALTER TABLE user_products ADD COLUMN price_unit TEXT NOT NULL DEFAULT ''")
 
     def _exec(self, sql: str, args: tuple = ()):
         with self.lock:
@@ -120,6 +125,16 @@ class Store:
         if not self._exec("SELECT 1 FROM user_products WHERE user_id=? AND product=?", (user_id, product)):
             self._exec("INSERT INTO user_products (user_id, product, added_at) VALUES (?, ?, ?)",
                        (user_id, product, _now().isoformat()))
+
+    def prices(self, user_id: int) -> dict[str, dict]:
+        """{product: {"price": Kč per unit or None, "price_unit": "l"/"kg"/""}} for the user's stock."""
+        rows = self._exec("SELECT product, price, price_unit FROM user_products WHERE user_id=?", (user_id,))
+        return {r[0]: {"price": r[1], "price_unit": r[2] or ""} for r in rows}
+
+    def set_price(self, user_id: int, product: str, price: float | None, unit: str) -> None:
+        self.add_product(user_id, product)
+        self._exec("UPDATE user_products SET price=?, price_unit=? WHERE user_id=? AND product=?",
+                   (price, unit if price else "", user_id, product))
 
     def remove_product(self, user_id: int, product: str) -> None:
         self._exec("DELETE FROM user_products WHERE user_id=? AND product=?", (user_id, product))

@@ -16,6 +16,7 @@ from . import config
 from . import evaluate as ev
 from . import lpis
 from . import myfields as mf
+from . import prices as pr
 from . import records as rec
 from . import support as sup
 from . import users
@@ -111,9 +112,42 @@ def products(q: str = "", user: dict = Depends(current_user), con=Depends(regist
     return ev.search_products(con, q.strip())
 
 
+class ProductPrice(BaseModel):
+    product: str
+    price: float | str | None = None
+    unit: str = "l"
+
+
+def _stock(con, user_id: int) -> list[dict]:
+    """The user's stock with registry info and the purchase price they entered."""
+    prices = store.prices(user_id)
+    out = ev.product_info(con, store.products(user_id))
+    for p in out:
+        p.update(prices.get(p["product"], {"price": None, "price_unit": ""}))
+    return out
+
+
 @app.get("/api/my-products")
 def my_products(user: dict = Depends(current_user), con=Depends(registry)):
-    return ev.product_info(con, store.products(user["id"]))
+    return _stock(con, user["id"])
+
+
+@app.put("/api/my-products/price")
+def set_product_price(body: ProductPrice, user: dict = Depends(current_user), con=Depends(registry)):
+    """Purchase price in Kč per litre or kilogram; empty clears it."""
+    raw = "" if body.price is None else str(body.price).replace(" ", "").replace("\u00a0", "").replace(",", ".")
+    try:
+        price = round(float(raw), 2) if raw else None
+    except ValueError:
+        raise HTTPException(400, "Cenu zadejte jako číslo, např. 1250 nebo 1250,50.")
+    if price is not None and not (0 < price < 1_000_000):
+        raise HTTPException(400, "Cena musí být větší než 0.")
+    if body.unit not in pr.PRICE_UNITS:
+        raise HTTPException(400, "Jednotka ceny musí být l nebo kg.")
+    if not ev.product_info(con, [body.product])[0]["known"] and body.product not in store.products(user["id"]):
+        raise HTTPException(400, "Přípravek v registru není.")
+    store.set_price(user["id"], body.product, price, body.unit)
+    return _stock(con, user["id"])
 
 
 @app.post("/api/my-products")
@@ -121,13 +155,13 @@ def add_my_product(body: ProductName, user: dict = Depends(current_user), con=De
     if not ev.product_info(con, [body.product])[0]["known"]:
         raise HTTPException(400, "Přípravek v registru není.")
     store.add_product(user["id"], body.product)
-    return ev.product_info(con, store.products(user["id"]))
+    return _stock(con, user["id"])
 
 
 @app.delete("/api/my-products")
 def remove_my_product(product: str, user: dict = Depends(current_user), con=Depends(registry)):
     store.remove_product(user["id"], product)
-    return ev.product_info(con, store.products(user["id"]))
+    return _stock(con, user["id"])
 
 
 # --- my fields (all DPBs of the user's ID JI, with their own names) ----------------------------
@@ -214,7 +248,8 @@ def evaluate(field_id: str, crop: str, nozzle: int = 0, user: dict = Depends(cur
     if entry is None:
         raise HTTPException(404, "Nejdřív načtěte pozemek.")
     try:
-        return ev.evaluate(con, entry["ctx"], crop, nozzle, owned=set(store.products(user["id"])))
+        return ev.evaluate(con, entry["ctx"], crop, nozzle, owned=store.prices(user["id"]),
+                           area_ha=entry["field"].get("area_ha"))
     except ValueError as e:
         raise HTTPException(400, str(e))
 
