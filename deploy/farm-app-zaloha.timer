@@ -1,0 +1,9 @@
+[Unit]
+Description=Farm App: záloha každý den
+
+[Timer]
+OnCalendar=*-*-* 02:30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

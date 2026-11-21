@@ -69,6 +69,52 @@ Aplikace běží jen u vás na počítači a otevírá se v prohlížeči. Potř
 
 Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python -m app.registry_import`.
 
+## Spuštění na webu (server + Cloudflare)
+
+Aplikace poběží pořád, i když máte počítač vypnutý. Běží na malém pronajatém serveru s Ubuntu a ven ji pouští Cloudflare Tunnel. Ten zajistí HTTPS a server nemusí mít otevřené žádné porty. Data (účty, sklad, evidence) jsou na disku serveru ve složce `/opt/farm-app/data`. Každou noc se záloha uloží do `/opt/farm-app/zalohy` (posledních 30 dní) a registr přípravků se sám aktualizuje 1. dne v měsíci.
+
+**Co je potřeba**
+
+- Server s Ubuntu 24.04 (stačí 2 GB paměti), např. Hetzner nebo Wedos. Po založení dostanete IP adresu a heslo pro uživatele `root`.
+- Doména (např. `nazev.cz`), přidaná do Cloudflare (bezplatný účet). U registrátora domény se nastaví jmenné servery, které ukáže Cloudflare.
+
+**1. Tunel v Cloudflare**
+
+1. V Cloudflare otevřete **Zero Trust → Networks → Tunnels → Create a tunnel**, typ **Cloudflared**, pojmenujte ho např. `farm-app`.
+2. Zkopírujte token (dlouhý text za `cloudflared service install`).
+3. V kroku **Public hostname** zadejte doménu (např. `nazev.cz` nebo `app.nazev.cz`), typ **HTTP** a adresu **localhost:8000**.
+
+**2. Instalace na server**
+
+Ve Windows otevřete příkazový řádek a připojte se na server (místo `IP` napište adresu serveru):
+
+```
+ssh root@IP
+```
+
+Na serveru zadejte (místo `TOKEN` vložte token z Cloudflare):
+
+```
+curl -fsSL https://raw.githubusercontent.com/BigBlackMeow/Farm-app/main/deploy/instalace-serveru.sh | bash -s -- TOKEN
+```
+
+Instalace trvá pár minut. Na konci napíše „HOTOVO“.
+
+**3. Přenesení vašich dat z počítače**
+
+Ve Windows otevřete příkazový řádek ve složce aplikace (tam, kde je složka `data`) a zadejte:
+
+```
+scp -r data root@IP:/opt/farm-app/
+ssh root@IP "chown -R farmapp:farmapp /opt/farm-app/data && systemctl restart farm-app"
+```
+
+Tím se na server přenesou účty, sklad, evidence, nastavení i stažený registr. Pak otevřete svou doménu v prohlížeči.
+
+**Nová verze aplikace na serveru**
+
+Stačí znovu spustit příkaz z kroku 2. Kód se aktualizuje, data zůstanou.
+
 ## Známá omezení
 
 - **Vodní toky:** počítají se stálé i občasné toky a vodní plochy ze ZABAGED. Podzemní (zatrubněné) toky se nepočítají. Meliorační příkopy, které v ZABAGED nejsou, aplikace nevidí.
