@@ -85,8 +85,15 @@ Registr se mění zhruba jednou za měsíc. Aktualizujete ho příkazem `python 
 - `app/evaluate.py`: vyhodnocení přípravků pro pozemek a plodinu
 - `app/main.py`: API (FastAPI)
 - `app/records.py`: evidence postřiků, export do CSV a tisková sestava
-- `app/users.py`: účty, přihlášení (heslo hashované scryptem, cookie) a sklad přípravků; ukládá se do `data/users.sqlite`
+- `app/users.py`: účty, přihlášení a sklad přípravků; ukládá se do `data/users.sqlite`. Hesla se neukládají, jen jejich otisk (scrypt se solí). Přihlašovací cookie je náhodný token a v databázi je jen jeho otisk (SHA-256). Po 5 špatných heslech za 15 minut se přihlášení na chvíli zablokuje.
 - `app/static/index.html`: webové rozhraní (Leaflet). Fotka na přihlašovací obrazovce: James Baltz, [Unsplash](https://unsplash.com/photos/agricultural-sprayers-in-green-corn-field-jAt6cN6zl8M) (licence Unsplash).
+
+## Můj účet a správce
+
+- Na stránce **Můj účet** (v horní liště, nebo kliknutím na své jméno) jde změnit jméno a heslo, odhlásit se na ostatních zařízeních a **smazat účet** se všemi daty (sklad, pole, evidence, zprávy podpory). Smazání se potvrzuje heslem.
+- **Správce** na stejné stránce vidí seznam všech uživatelů a může je odhlásit nebo smazat. Jen správce může nastavit odesílání zpráv z Podpory.
+- Kdo je správce: e-maily v proměnné prostředí `ADMIN_EMAILS` (oddělené čárkou), nebo v `data/nastaveni.json` jako `"spravci": ["vas@email.cz"]`. Když není nastaveno nic, správcem je nejstarší účet v aplikaci. **Na veřejném webu `ADMIN_EMAILS` nastavte**, ať se správcem nestane náhodou někdo jiný.
+- Po této aktualizaci se všichni musí jednou znovu přihlásit (staré přihlášení se kvůli bezpečnějšímu ukládání zruší).
 
 ## Nastavení: název aplikace a e-mail pro podporu
 
