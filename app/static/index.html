@@ -222,6 +222,9 @@
   .bottombar .sum { flex:1; min-width:0; font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .bottombar .sum b { color:var(--text); }
   @media (max-width: 640px) { .bottombar-in { padding:10px 12px; gap:8px; } .bottombar .sum { font-size:12px; white-space:normal; } }
+  .leaflet-control-layers label { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:14px; cursor:pointer; }
+  .leaflet-control-layers input { width:auto; padding:0; margin:0; border:0; outline:none; accent-color:var(--accent); }
+  .leaflet-control-layers label > span, .leaflet-control-layers label > div { display:flex; align-items:center; gap:8px; }
 </style>
 </head>
 <body>
@@ -667,7 +670,20 @@ let map = null, fieldLayer = null, slopeLayer = null, waterLayer = null;
 function initMap() {
   if (map) return;
   map = L.map("map").setView([49.8, 15.5], 7);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+  // Base maps: ČÚZK (Czech state maps, no usage limits for this use) first, OpenStreetMap as an extra option.
+  const cuzk = (svc, label) => L.tileLayer(`https://ags.cuzk.gov.cz/arcgis1/rest/services/${svc}/MapServer/tile/{z}/{y}/{x}`,
+    { maxZoom: 20, maxNativeZoom: svc === "ORTOFOTO_WM" ? 20 : 19, attribution: `${label} © ČÚZK` });
+  const baseMaps = {
+    "Základní mapa": cuzk("ZTM_WM", "Základní mapa"),
+    "Letecká (ortofoto)": cuzk("ORTOFOTO_WM", "Ortofoto"),
+    "OpenStreetMap": L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 19, attribution: "© OpenStreetMap", referrerPolicy: "strict-origin-when-cross-origin" }),
+  };
+  let baseName = "Základní mapa";
+  try { const b = localStorage.getItem("baseMap"); if (baseMaps[b]) baseName = b; } catch {}
+  baseMaps[baseName].addTo(map);
+  L.control.layers(baseMaps, null, { position: "topright" }).addTo(map);
+  map.on("baselayerchange", e => { try { localStorage.setItem("baseMap", e.name); } catch {} });
   lpisWms = L.tileLayer.wms("https://mze.gov.cz/public/app/wms/public_DPB_PB_OPV.fcgi", {
     layers: "DPB_UCINNE", format: "image/png", transparent: true, minZoom: 13, attribution: "LPIS © MZe"
   }).addTo(map);
